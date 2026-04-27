@@ -2498,6 +2498,182 @@
       color: var(--text-muted);
       line-height: 1.5;
     }
+
+    /* ══════════════════════════════════════════
+       VOICE CHANNEL
+    ══════════════════════════════════════════ */
+    .voice-card {
+      margin-top: 12px;
+    }
+
+    .voice-join-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border-subtle);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 140ms, color 140ms, border-color 140ms;
+    }
+
+    .voice-join-btn:hover {
+      background: var(--accent-soft);
+      color: var(--text-main);
+      border-color: var(--border-strong);
+    }
+
+    .voice-join-btn.active {
+      background: rgba(34,197,94,0.12);
+      color: #22c55e;
+      border-color: rgba(34,197,94,0.3);
+    }
+
+    .voice-join-btn svg {
+      flex-shrink: 0;
+    }
+
+    .voice-live-panel {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 0 4px;
+    }
+
+    .voice-live-panel.open {
+      display: flex;
+    }
+
+    .voice-participants {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .voice-participant {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      transition: background 120ms;
+    }
+
+    .voice-participant:hover {
+      background: var(--accent-soft);
+    }
+
+    .voice-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+      flex-shrink: 0;
+      border: 2px solid transparent;
+      transition: border-color 120ms, box-shadow 120ms;
+      overflow: hidden;
+    }
+
+    .voice-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .voice-avatar.speaking {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+    }
+
+    .voice-participant-name {
+      font-size: 13px;
+      color: var(--text-main);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .voice-participant-muted {
+      font-size: 13px;
+      color: var(--text-soft);
+      opacity: 0;
+      transition: opacity 120ms;
+    }
+
+    .voice-participant.muted .voice-participant-muted {
+      opacity: 1;
+    }
+
+    .voice-controls {
+      display: flex;
+      gap: 6px;
+      padding: 4px 8px 0;
+    }
+
+    .voice-ctrl-btn {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border-subtle);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 130ms, color 130ms, border-color 130ms;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .voice-ctrl-btn:hover {
+      background: var(--accent-soft);
+      color: var(--text-main);
+      border-color: var(--border-strong);
+    }
+
+    .voice-ctrl-btn.muted-state {
+      background: rgba(239,68,68,0.1);
+      color: #ef4444;
+      border-color: rgba(239,68,68,0.3);
+    }
+
+    .voice-ctrl-btn.leave-btn:hover {
+      background: rgba(239,68,68,0.12);
+      color: #ef4444;
+      border-color: rgba(239,68,68,0.3);
+    }
+
+    .voice-status-text {
+      font-size: 11px;
+      color: var(--text-soft);
+      padding: 0 8px;
+      text-align: center;
+    }
+
+    @keyframes voicePulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.25); }
+      50% { box-shadow: 0 0 0 6px rgba(34,197,94,0.1); }
+    }
+
+    .voice-avatar.speaking {
+      animation: voicePulse 800ms ease-in-out infinite;
+    }
   </style>
 </head>
 <body class="theme-dark">
@@ -2617,6 +2793,46 @@
             </div>
           </div>
           <div class="sidebar-body" id="membersList"></div>
+        </div>
+
+        <!-- Voice Channel -->
+        <div class="sidebar-card voice-card">
+          <div class="sidebar-header">
+            <span class="sidebar-title">🎙 Voice</span>
+          </div>
+          <div class="sidebar-body" style="padding:8px;">
+            <button class="voice-join-btn" id="voiceJoinBtn" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+              Join Voice
+            </button>
+            <div class="voice-live-panel" id="voiceLivePanel">
+              <div class="voice-participants" id="voiceParticipants"></div>
+              <div class="voice-controls">
+                <button class="voice-ctrl-btn" id="voiceMuteBtn" type="button">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="muteIcon">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                  </svg>
+                  Mute
+                </button>
+                <button class="voice-ctrl-btn leave-btn" id="voiceLeaveBtn" type="button">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Leave
+                </button>
+              </div>
+              <div class="voice-status-text" id="voiceStatusText"></div>
+            </div>
+          </div>
         </div>
       </aside>
     </main>
@@ -4503,6 +4719,448 @@
       resize();
       draw();
     })();
+  </script>
+
+  <!-- ══ VOICE CHAT (WebRTC + Firestore signalling) ══ -->
+  <script>
+  (function() {
+    // ── Config ──────────────────────────────────────────────────────────────
+    const ROOM_ID   = 'general';
+    const ROOM_REF  = () => db.collection('voiceRooms').doc(ROOM_ID);
+    const SIGS_REF  = () => ROOM_REF().collection('signals');
+
+    const ICE_SERVERS = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        // Free TURN via Open Relay (metered.ca free tier)
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
+    };
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let localStream    = null;
+    let isMuted        = false;
+    let inVoice        = false;
+    let myUid          = null;
+
+    // peers[uid] = { pc: RTCPeerConnection, stream: MediaStream, analyser, dataArr }
+    const peers        = {};
+    let roomUnsub      = null;
+    let sigsUnsub      = null;
+
+    // Speaking detection
+    const speakMap     = {};   // uid -> bool
+    let localAnalyser  = null;
+    let localDataArr   = null;
+    let speakTick      = null;
+
+    // ── DOM refs ─────────────────────────────────────────────────────────────
+    const joinBtn      = document.getElementById('voiceJoinBtn');
+    const livePanel    = document.getElementById('voiceLivePanel');
+    const participants = document.getElementById('voiceParticipants');
+    const muteBtn      = document.getElementById('voiceMuteBtn');
+    const leaveBtn     = document.getElementById('voiceLeaveBtn');
+    const statusText   = document.getElementById('voiceStatusText');
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function myDisplayName() {
+      if (typeof currentProfile !== 'undefined' && currentProfile && currentProfile.displayName)
+        return currentProfile.displayName;
+      if (typeof currentUser !== 'undefined' && currentUser)
+        return currentUser.email || 'User';
+      return 'User';
+    }
+
+    function myPhotoData() {
+      if (typeof currentProfile !== 'undefined' && currentProfile)
+        return currentProfile.photoData || null;
+      return null;
+    }
+
+    function initials(name) {
+      return (name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    }
+
+    function avatarHTML(name, photo) {
+      if (photo) return `<img src="${photo}" alt="${name}" />`;
+      return initials(name);
+    }
+
+    function setStatus(msg) {
+      statusText.textContent = msg;
+    }
+
+    // ── Speaking detection ────────────────────────────────────────────────────
+    function makeAnalyser(stream) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = ctx.createMediaStreamSource(stream);
+        const an  = ctx.createAnalyser();
+        an.fftSize = 512;
+        src.connect(an);
+        const arr = new Uint8Array(an.frequencyBinCount);
+        return { analyser: an, dataArr: arr };
+      } catch(e) { return null; }
+    }
+
+    function isSpeaking(analyser, dataArr) {
+      if (!analyser) return false;
+      analyser.getByteFrequencyData(dataArr);
+      let sum = 0;
+      for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
+      return (sum / dataArr.length) > 6;
+    }
+
+    function startSpeakLoop() {
+      if (speakTick) return;
+      speakTick = setInterval(() => {
+        // local speaking
+        if (localAnalyser) {
+          const speaking = isSpeaking(localAnalyser.analyser, localAnalyser.dataArr);
+          updateSpeakingUI(myUid, speaking);
+        }
+        // remote speaking
+        Object.entries(peers).forEach(([uid, p]) => {
+          if (p.analyser) {
+            const speaking = isSpeaking(p.analyser.analyser, p.analyser.dataArr);
+            updateSpeakingUI(uid, speaking);
+          }
+        });
+      }, 80);
+    }
+
+    function stopSpeakLoop() {
+      if (speakTick) { clearInterval(speakTick); speakTick = null; }
+    }
+
+    function updateSpeakingUI(uid, speaking) {
+      const el = document.querySelector(`.voice-avatar[data-uid="${uid}"]`);
+      if (!el) return;
+      el.classList.toggle('speaking', speaking);
+    }
+
+    // ── Participant UI ────────────────────────────────────────────────────────
+    function renderParticipants(roomData) {
+      const parts = roomData.participants || {};
+      participants.innerHTML = '';
+      Object.entries(parts).forEach(([uid, info]) => {
+        const isSelf = uid === myUid;
+        const name   = info.displayName || 'User';
+        const photo  = info.photoData   || null;
+        const muted  = info.muted       || false;
+
+        const row  = document.createElement('div');
+        row.className = 'voice-participant' + (muted ? ' muted' : '');
+        row.innerHTML = `
+          <div class="voice-avatar" data-uid="${uid}">${avatarHTML(name, photo)}</div>
+          <span class="voice-participant-name">${name}${isSelf ? ' (you)' : ''}</span>
+          <span class="voice-participant-muted">🔇</span>
+        `;
+        participants.appendChild(row);
+      });
+
+      const count = Object.keys(parts).length;
+      setStatus(count === 1 ? 'Only you — invite someone!' : `${count} in voice`);
+    }
+
+    // ── Firestore room helpers ────────────────────────────────────────────────
+    async function joinRoomDoc() {
+      await ROOM_REF().set({
+        [`participants.${myUid}`]: {
+          displayName: myDisplayName(),
+          photoData: myPhotoData(),
+          muted: false,
+          joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }
+      }, { merge: true });
+    }
+
+    async function leaveRoomDoc() {
+      await ROOM_REF().update({
+        [`participants.${myUid}`]: firebase.firestore.FieldValue.delete()
+      }).catch(() => {});
+    }
+
+    async function setMutedInRoom(muted) {
+      await ROOM_REF().update({
+        [`participants.${myUid}.muted`]: muted
+      }).catch(() => {});
+    }
+
+    // ── WebRTC peer management ────────────────────────────────────────────────
+    async function createPeer(remoteUid, polite) {
+      if (peers[remoteUid]) return peers[remoteUid].pc;
+
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      peers[remoteUid] = { pc, stream: null, analyser: null };
+
+      // Add local tracks
+      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+      // ICE candidates → Firestore
+      pc.onicecandidate = ({ candidate }) => {
+        if (!candidate) return;
+        SIGS_REF().add({
+          from: myUid, to: remoteUid,
+          type: 'ice', payload: candidate.toJSON(),
+          ts: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      };
+
+      // Remote stream → hidden audio element
+      pc.ontrack = ({ streams }) => {
+        const stream = streams[0];
+        peers[remoteUid].stream = stream;
+
+        const audio = document.createElement('audio');
+        audio.autoplay = true;
+        audio.setAttribute('playsinline', '');
+        audio.srcObject = stream;
+        audio.id = `voice-audio-${remoteUid}`;
+        document.body.appendChild(audio);
+
+        const an = makeAnalyser(stream);
+        if (an) peers[remoteUid].analyser = an;
+      };
+
+      // Negotiation (perfect negotiation pattern)
+      let makingOffer = false;
+      let ignoreOffer = false;
+
+      pc.onnegotiationneeded = async () => {
+        try {
+          makingOffer = true;
+          await pc.setLocalDescription();
+          SIGS_REF().add({
+            from: myUid, to: remoteUid,
+            type: 'offer', payload: pc.localDescription.toJSON(),
+            ts: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(e) { console.error('offer err', e); }
+        finally { makingOffer = false; }
+      };
+
+      // If we are the "impolite" peer and uid sort says we initiate, trigger offer
+      if (!polite) {
+        try {
+          await pc.setLocalDescription();
+          SIGS_REF().add({
+            from: myUid, to: remoteUid,
+            type: 'offer', payload: pc.localDescription.toJSON(),
+            ts: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(e) {}
+      }
+
+      return pc;
+    }
+
+    function closePeer(remoteUid) {
+      const p = peers[remoteUid];
+      if (!p) return;
+      p.pc.close();
+      delete peers[remoteUid];
+      const audio = document.getElementById(`voice-audio-${remoteUid}`);
+      if (audio) audio.remove();
+    }
+
+    // ── Signal listener ────────────────────────────────────────────────────────
+    function listenSignals() {
+      sigsUnsub = SIGS_REF()
+        .where('to', '==', myUid)
+        .orderBy('ts', 'asc')
+        .onSnapshot(async snap => {
+          for (const change of snap.docChanges()) {
+            if (change.type !== 'added') continue;
+            const sig = change.doc.data();
+            const fromUid = sig.from;
+            // delete processed signal
+            change.doc.ref.delete().catch(() => {});
+
+            const polite = myUid > fromUid; // deterministic politeness
+            let pc = peers[fromUid] ? peers[fromUid].pc : await createPeer(fromUid, polite);
+
+            if (sig.type === 'offer') {
+              const offerCollision = pc.signalingState !== 'stable' && !polite;
+              if (offerCollision) continue;
+              await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+              await pc.setLocalDescription();
+              SIGS_REF().add({
+                from: myUid, to: fromUid,
+                type: 'answer', payload: pc.localDescription.toJSON(),
+                ts: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            } else if (sig.type === 'answer') {
+              if (pc.signalingState === 'have-local-offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+              }
+            } else if (sig.type === 'ice') {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
+              } catch(e) {}
+            }
+          }
+        }, err => console.error('signals error', err));
+    }
+
+    // ── Room listener ─────────────────────────────────────────────────────────
+    function listenRoom() {
+      roomUnsub = ROOM_REF().onSnapshot(snap => {
+        if (!snap.exists) return;
+        const data = snap.data();
+        renderParticipants(data);
+
+        const parts = data.participants || {};
+
+        // Connect to any new participant
+        Object.keys(parts).forEach(uid => {
+          if (uid === myUid) return;
+          if (!peers[uid]) {
+            const polite = myUid > uid;
+            createPeer(uid, polite);
+          }
+        });
+
+        // Disconnect from anyone who left
+        Object.keys(peers).forEach(uid => {
+          if (!parts[uid]) closePeer(uid);
+        });
+      }, err => console.error('room error', err));
+    }
+
+    // ── Join / Leave ──────────────────────────────────────────────────────────
+    async function joinVoice() {
+      if (typeof currentUser === 'undefined' || !currentUser) {
+        alert('Sign in to use voice chat.');
+        return;
+      }
+
+      myUid = currentUser.uid;
+      setStatus('Requesting microphone…');
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch(e) {
+        setStatus('Microphone access denied.');
+        console.error(e);
+        return;
+      }
+
+      // Local speaking indicator
+      const an = makeAnalyser(localStream);
+      if (an) localAnalyser = an;
+
+      inVoice = true;
+      joinBtn.classList.add('active');
+      joinBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+        </svg>
+        Connected`;
+      livePanel.classList.add('open');
+
+      await joinRoomDoc();
+      listenRoom();
+      listenSignals();
+      startSpeakLoop();
+      setStatus('You joined voice.');
+    }
+
+    async function leaveVoice() {
+      if (!inVoice) return;
+      inVoice = false;
+
+      stopSpeakLoop();
+
+      if (sigsUnsub) { sigsUnsub(); sigsUnsub = null; }
+      if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+
+      Object.keys(peers).forEach(uid => closePeer(uid));
+
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      localAnalyser = null;
+
+      await leaveRoomDoc();
+
+      joinBtn.classList.remove('active');
+      joinBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        Join Voice`;
+      livePanel.classList.remove('open');
+      participants.innerHTML = '';
+      isMuted = false;
+      muteBtn.classList.remove('muted-state');
+      muteBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+        </svg>
+        Mute`;
+      setStatus('');
+    }
+
+    function toggleMute() {
+      if (!localStream) return;
+      isMuted = !isMuted;
+      localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+      setMutedInRoom(isMuted);
+
+      muteBtn.classList.toggle('muted-state', isMuted);
+      if (isMuted) {
+        muteBtn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+          </svg>
+          Unmute`;
+      } else {
+        muteBtn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+          </svg>
+          Mute`;
+      }
+    }
+
+    // ── Clean up on tab close ─────────────────────────────────────────────────
+    window.addEventListener('beforeunload', () => {
+      if (inVoice) leaveRoomDoc();
+    });
+
+    // ── Wire buttons ──────────────────────────────────────────────────────────
+    joinBtn.addEventListener('click', () => {
+      if (inVoice) leaveVoice();
+      else joinVoice();
+    });
+    muteBtn.addEventListener('click', toggleMute);
+    leaveBtn.addEventListener('click', leaveVoice);
+  })();
   </script>
 </body>
 </html>
