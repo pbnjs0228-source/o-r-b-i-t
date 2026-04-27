@@ -2790,12 +2790,106 @@
       color: #ef4444;
     }
 
+    /* ── Mic input level meter ── */
+    .mic-meter-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      margin: 4px 0 2px;
+    }
+
+    .mic-meter-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-soft);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .mic-meter-track {
+      flex: 1;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      position: relative;
+      overflow: visible;
+    }
+
+    .mic-meter-fill {
+      height: 100%;
+      border-radius: 999px;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e 0%, #86efac 60%, #fbbf24 85%, #ef4444 100%);
+      transition: width 60ms linear;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Clipping warning: fill turns red when near max */
+    .mic-meter-fill.clipping {
+      background: #ef4444;
+    }
+
+    /* Peak hold marker */
+    .mic-meter-peak {
+      position: absolute;
+      top: -1px;
+      width: 2px;
+      height: 8px;
+      border-radius: 1px;
+      background: #fbbf24;
+      opacity: 0;
+      transition: left 80ms linear, opacity 400ms ease;
+      z-index: 2;
+    }
+
+    .mic-meter-peak.visible {
+      opacity: 1;
+    }
+
+    .mic-meter-val {
+      font-size: 10px;
+      color: var(--text-soft);
+      min-width: 28px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    /* ── Hear yourself row ── */
+    .hear-yourself-row {
+      padding: 0 8px 2px;
+    }
+
+    .hear-btn {
+      width: 100%;
+      justify-content: center;
+      font-size: 12px;
+      border-style: dashed;
+    }
+
+    .hear-btn.active {
+      background: rgba(168, 85, 247, 0.15);
+      color: #a855f7;
+      border-color: rgba(168, 85, 247, 0.4);
+      border-style: solid;
+    }
+
+    .hear-btn.active svg {
+      animation: voicePulse 900ms ease-in-out infinite;
+      border-radius: 50%;
+    }
+
     /* Mobile: voice card gets enough height to show content */
     @media (max-width: 640px) {
       .voice-card {
         flex-shrink: 0;
         max-height: none;
       }
+      .mic-meter-wrap { padding: 4px 6px; }
     }
   </style>
 </head>
@@ -2941,6 +3035,35 @@
             </button>
             <div class="voice-live-panel" id="voiceLivePanel">
               <div class="voice-participants" id="voiceParticipants"></div>
+
+              <!-- Mic input meter -->
+              <div class="mic-meter-wrap" id="micMeterWrap">
+                <div class="mic-meter-label">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                  </svg>
+                  <span>Mic input</span>
+                </div>
+                <div class="mic-meter-track" id="micMeterTrack">
+                  <div class="mic-meter-fill" id="micMeterFill"></div>
+                  <div class="mic-meter-peak" id="micMeterPeak"></div>
+                </div>
+                <span class="mic-meter-val" id="micMeterVal">—</span>
+              </div>
+
+              <!-- Hear yourself test -->
+              <div class="hear-yourself-row">
+                <button class="voice-ctrl-btn hear-btn" id="hearYourselfBtn" type="button">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                  </svg>
+                  Hear yourself
+                </button>
+              </div>
+
               <div class="voice-controls">
                 <button class="voice-ctrl-btn" id="voiceMuteBtn" type="button">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="muteIcon">
@@ -4898,6 +5021,16 @@
     let localDataArr   = null;
     let speakTick      = null;
 
+    // Mic meter
+    let micRafId       = null;
+    let peakLevel      = 0;
+    let peakHoldTimer  = null;
+
+    // Hear yourself loopback
+    let hearYourself   = false;
+    let loopbackAudio  = null;
+    let loopbackCtx    = null;
+
     // ── DOM refs ─────────────────────────────────────────────────────────────
     const joinBtn      = document.getElementById('voiceJoinBtn');
     const livePanel    = document.getElementById('voiceLivePanel');
@@ -4908,6 +5041,10 @@
     const previewPanel = document.getElementById('voicePreviewPanel');
     const previewList  = document.getElementById('voicePreviewList');
     const countBadge   = document.getElementById('voiceCountBadge');
+    const micMeterFill = document.getElementById('micMeterFill');
+    const micMeterPeak = document.getElementById('micMeterPeak');
+    const micMeterVal  = document.getElementById('micMeterVal');
+    const hearBtn      = document.getElementById('hearYourselfBtn');
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     // Cached after Firestore fetch on join — avoids cross-script let scoping issues
@@ -4941,16 +5078,18 @@
       statusText.textContent = msg;
     }
 
-    // ── Speaking detection ────────────────────────────────────────────────────
+    // ── Speaking detection + mic meter ────────────────────────────────────────
     function makeAnalyser(stream) {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const src = ctx.createMediaStreamSource(stream);
         const an  = ctx.createAnalyser();
-        an.fftSize = 512;
+        an.fftSize = 1024;  // larger: gives both good freq bins and time-domain samples
+        an.smoothingTimeConstant = 0.4;
         src.connect(an);
-        const arr = new Uint8Array(an.frequencyBinCount);
-        return { analyser: an, dataArr: arr };
+        const arr     = new Uint8Array(an.frequencyBinCount);  // frequency (256 bins)
+        const timeArr = new Uint8Array(an.fftSize);            // time domain (1024 samples)
+        return { analyser: an, dataArr: arr, timeArr, ctx };
       } catch(e) { return null; }
     }
 
@@ -4960,6 +5099,120 @@
       let sum = 0;
       for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
       return (sum / dataArr.length) > 6;
+    }
+
+    // ── Mic level meter (rAF-driven, smooth) ─────────────────────────────────
+    function startMicMeter() {
+      if (micRafId) return;
+      peakLevel = 0;
+
+      function drawMeter() {
+        if (!localAnalyser) { micRafId = null; return; }
+        const { analyser, timeArr } = localAnalyser;
+        analyser.getByteTimeDomainData(timeArr);
+
+        // RMS level from time-domain waveform
+        let sumSq = 0;
+        for (let i = 0; i < timeArr.length; i++) {
+          const v = (timeArr[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / timeArr.length);
+
+        // dB: map 0..1 → −60..0 dB, display as percentage
+        const db  = rms > 0 ? Math.max(-60, 20 * Math.log10(rms)) : -60;
+        const pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+
+        // Peak hold
+        if (pct > peakLevel) {
+          peakLevel = pct;
+          clearTimeout(peakHoldTimer);
+          peakHoldTimer = setTimeout(() => {
+            peakLevel = 0;
+            micMeterPeak.classList.remove('visible');
+          }, 1200);
+        }
+
+        micMeterFill.style.width = pct.toFixed(1) + '%';
+        micMeterFill.classList.toggle('clipping', pct > 90);
+
+        if (peakLevel > 0) {
+          micMeterPeak.style.left = peakLevel.toFixed(1) + '%';
+          micMeterPeak.classList.add('visible');
+        }
+
+        // Label: show dB value
+        micMeterVal.textContent = db > -59 ? db.toFixed(0) + 'dB' : '—';
+
+        micRafId = requestAnimationFrame(drawMeter);
+      }
+
+      micRafId = requestAnimationFrame(drawMeter);
+    }
+
+    function stopMicMeter() {
+      if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
+      clearTimeout(peakHoldTimer);
+      micMeterFill.style.width = '0%';
+      micMeterPeak.classList.remove('visible');
+      micMeterVal.textContent = '—';
+    }
+
+    // ── Hear yourself (loopback to own speakers) ──────────────────────────────
+    function startHearYourself() {
+      if (!localStream || loopbackAudio) return;
+      hearYourself = true;
+
+      // Connect mic → AudioContext destination (speakers) at reduced gain to prevent feedback
+      try {
+        loopbackCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src  = loopbackCtx.createMediaStreamSource(localStream);
+        const gain = loopbackCtx.createGain();
+        gain.gain.value = 0.85; // slight reduction to reduce feedback risk
+        src.connect(gain);
+        gain.connect(loopbackCtx.destination);
+      } catch(e) {
+        // Fallback: plain audio element loopback
+        loopbackAudio = document.createElement('audio');
+        loopbackAudio.autoplay = true;
+        loopbackAudio.setAttribute('playsinline', '');
+        loopbackAudio.muted = false;
+        loopbackAudio.srcObject = localStream;
+        document.body.appendChild(loopbackAudio);
+      }
+
+      hearBtn.classList.add('active');
+      hearBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+        Hearing yourself…`;
+    }
+
+    function stopHearYourself() {
+      hearYourself = false;
+      if (loopbackCtx) {
+        try { loopbackCtx.close(); } catch(e) {}
+        loopbackCtx = null;
+      }
+      if (loopbackAudio) {
+        loopbackAudio.srcObject = null;
+        loopbackAudio.remove();
+        loopbackAudio = null;
+      }
+      hearBtn.classList.remove('active');
+      hearBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+        Hear yourself`;
+    }
+
+    function toggleHearYourself() {
+      if (hearYourself) stopHearYourself();
+      else startHearYourself();
     }
 
     function startSpeakLoop() {
@@ -5330,6 +5583,7 @@
       listenSignals();
       listenKicks();
       startSpeakLoop();
+      startMicMeter();
       // Hide preview panel while in voice
       previewPanel.style.display = 'none';
       countBadge.style.display = 'none';
@@ -5341,6 +5595,8 @@
       inVoice = false;
 
       stopSpeakLoop();
+      stopMicMeter();
+      stopHearYourself();
 
       if (sigsUnsub) { sigsUnsub(); sigsUnsub = null; }
       if (roomUnsub) { roomUnsub(); roomUnsub = null; }
@@ -5418,6 +5674,7 @@
     });
     muteBtn.addEventListener('click', toggleMute);
     leaveBtn.addEventListener('click', leaveVoice);
+    hearBtn.addEventListener('click', toggleHearYourself);
 
     // ── Start preview listener (shows who's in VC before you join) ────────────
     // Wait a tick so Firebase is initialised by the main script
