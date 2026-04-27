@@ -1,0 +1,4084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>O R B I T</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: #f2f2f7;
+      color: #111827;
+      transition:
+        background-color 180ms ease-out,
+        color 180ms ease-out;
+    }
+
+    :root {
+      --bg-body: #f2f2f7;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f9fafb;
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --text-soft: #9ca3af;
+      --accent: #111827;
+      --accent-soft: #e5e7eb;
+      --accent-contrast: #ffffff;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --radius-pill: 999px;
+      --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --shadow-modal: 0 18px 40px rgba(15, 23, 42, 0.18);
+      --input-bg: #ffffff;
+      --input-border-focus: #9ca3af;
+      --badge-bg: #ffffff;
+      --badge-border: #e5e7eb;
+      --danger: #b91c1c;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #ffffff;
+    }
+
+    body.theme-light {
+      --bg-body: #f2f2f7;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f9fafb;
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --text-soft: #9ca3af;
+      --accent: #111827;
+      --accent-soft: #e5e7eb;
+      --accent-contrast: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --shadow-modal: 0 18px 40px rgba(15, 23, 42, 0.18);
+      --input-bg: #ffffff;
+      --input-border-focus: #9ca3af;
+      --badge-bg: #ffffff;
+      --badge-border: #e5e7eb;
+      --danger: #b91c1c;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #ffffff;
+    }
+
+    body.theme-dark {
+      --bg-body: #020617;
+      --bg-surface: #020617;
+      --bg-subtle: #020617;
+      --border-subtle: #111827;
+      --border-strong: #1f2937;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --accent: #e5e7eb;
+      --accent-soft: #111827;
+      --accent-contrast: #020617;
+      --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.6);
+      --shadow-modal: 0 18px 40px rgba(0, 0, 0, 0.7);
+      --input-bg: #020617;
+      --input-border-focus: #4b5563;
+      --badge-bg: #020617;
+      --badge-border: #111827;
+      --danger: #fca5a5;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #020617;
+    }
+
+    body.theme-blue {
+      --bg-body: #e5f0ff;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f3f6ff;
+      --border-subtle: #d0e2ff;
+      --border-strong: #9cb8ff;
+      --text-main: #0f172a;
+      --text-muted: #4b5563;
+      --text-soft: #6b7280;
+      --accent: #1d4ed8;
+      --accent-soft: #dbeafe;
+      --accent-contrast: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.12);
+      --shadow-modal: 0 18px 40px rgba(15, 23, 42, 0.2);
+      --input-bg: #ffffff;
+      --input-border-focus: #60a5fa;
+      --badge-bg: #eff6ff;
+      --badge-border: #bfdbfe;
+      --danger: #b91c1c;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #ffffff;
+    }
+
+    body.theme-purple {
+      --bg-body: #f3e8ff;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f5f3ff;
+      --border-subtle: #e9d5ff;
+      --border-strong: #c4b5fd;
+      --text-main: #111827;
+      --text-muted: #4b5563;
+      --text-soft: #6b7280;
+      --accent: #7c3aed;
+      --accent-soft: #ede9fe;
+      --accent-contrast: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(76, 29, 149, 0.18);
+      --shadow-modal: 0 18px 40px rgba(76, 29, 149, 0.25);
+      --input-bg: #ffffff;
+      --input-border-focus: #a855f7;
+      --badge-bg: #f3e8ff;
+      --badge-border: #e9d5ff;
+      --danger: #b91c1c;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #ffffff;
+    }
+
+    body.theme-red {
+      --bg-body: #fef2f2;
+      --bg-surface: #ffffff;
+      --bg-subtle: #fef2f2;
+      --border-subtle: #fecaca;
+      --border-strong: #fca5a5;
+      --text-main: #111827;
+      --text-muted: #4b5563;
+      --text-soft: #6b7280;
+      --accent: #b91c1c;
+      --accent-soft: #fee2e2;
+      --accent-contrast: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(185, 28, 28, 0.18);
+      --shadow-modal: 0 18px 40px rgba(185, 28, 28, 0.25);
+      --input-bg: #ffffff;
+      --input-border-focus: #f87171;
+      --badge-bg: #fef2f2;
+      --badge-border: #fecaca;
+      --danger: #b91c1c;
+      --admin-badge-bg: #f97316;
+      --admin-badge-text: #ffffff;
+    }
+
+    body {
+      background: var(--bg-body);
+      color: var(--text-main);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInScale {
+      from {
+        opacity: 0;
+        transform: scale(0.96) translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes rainbowShift {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    @keyframes starDriftSlow {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(-14px, 10px, 0) scale(1.02); }
+      to { transform: translate3d(0, 0, 0) scale(1); }
+    }
+
+    @keyframes starDriftFast {
+      from { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(18px, -12px, 0); }
+      to { transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.85; }
+      25% { opacity: 0.4; }
+      50% { opacity: 1; }
+      75% { opacity: 0.55; }
+    }
+
+    @keyframes twinkleSlow {
+      0%, 100% { opacity: 0.7; }
+      33% { opacity: 0.2; }
+      66% { opacity: 0.9; }
+    }
+
+    @keyframes nebulaBreath {
+      0%, 100% { opacity: 0.65; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.04); }
+    }
+
+    @keyframes galaxyRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      height: 90vh;
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        box-shadow 180ms ease-out,
+        transform 120ms ease-out;
+    }
+
+    .app-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-subtle);
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .app-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .app-title-main {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .app-title-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .app-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 999px;
+      transition:
+        background-color 120ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    .app-user:hover {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .app-user:active {
+      transform: scale(0.98);
+    }
+
+    .app-user-label-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: flex-start;
+    }
+
+    .app-user-label-main {
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .app-user-label-sub {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-pill);
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      position: relative;
+      transition:
+        background-color 180ms ease-out,
+        transform 120ms ease-out;
+    }
+
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .status-banner {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      text-align: center;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        color 180ms ease-out;
+    }
+
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      padding: 8px 12px 12px;
+      gap: 8px;
+      min-height: 0;
+      transition: background-color 180ms ease-out;
+    }
+
+    .main-column {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .sidebar-column {
+      flex: 1.2;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .channel-header {
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .channel-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .channel-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .channel-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .channel-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .messages {
+      flex: 1;
+      margin-top: 4px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      padding: 8px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+      scroll-behavior: smooth;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .message-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      margin-top: 2px;
+      animation: fadeIn 140ms ease-out;
+      will-change: opacity;
+    }
+
+    .message-row.self {
+      justify-content: flex-end;
+    }
+
+    .message-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-pill);
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+      transition:
+        background-color 180ms ease-out,
+        transform 120ms ease-out;
+    }
+
+    .message-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .message-bubble {
+      max-width: 70%;
+      border-radius: 16px;
+      padding: 8px 10px;
+      background: #f3f4f6;
+      color: var(--text-main);
+      transition:
+        background-color 180ms ease-out,
+        color 180ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    body.theme-dark .message-bubble {
+      background: #111827;
+      color: #e5e7eb;
+    }
+
+    body.theme-blue .message-bubble {
+      background: #eff6ff;
+      color: #0f172a;
+    }
+
+    body.theme-purple .message-bubble {
+      background: #f3e8ff;
+      color: #111827;
+    }
+
+    body.theme-red .message-bubble {
+      background: #fee2e2;
+      color: #111827;
+    }
+
+    .message-row.self .message-bubble {
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+
+    /* ── Per-theme gradient self-bubbles ── */
+    body.theme-dark .message-row.self .message-bubble {
+      background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 45%, #c4b5fd 100%);
+      color: #1a0a3a;
+      border-color: transparent;
+    }
+
+    body.theme-light .message-row.self .message-bubble {
+      background: linear-gradient(135deg, #4c1d95 0%, #2e1065 50%, #6d28d9 100%);
+      color: #ede9fe;
+      border-color: transparent;
+    }
+
+    body.theme-blue .message-row.self .message-bubble {
+      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #3b82f6 100%);
+      color: #eff6ff;
+      border-color: transparent;
+    }
+
+    body.theme-purple .message-row.self .message-bubble {
+      background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #a855f7 100%);
+      color: #f5f3ff;
+      border-color: transparent;
+    }
+
+    body.theme-red .message-row.self .message-bubble {
+      background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #dc2626 100%);
+      color: #fff1f2;
+      border-color: transparent;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px 2px;
+      font-size: 11px;
+      color: var(--text-soft);
+      min-height: 22px;
+      transition: opacity 200ms ease;
+    }
+
+    .typing-indicator.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .typing-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-soft);
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    body.theme-dark .typing-dot { background: #a78bfa; }
+    body.theme-light .typing-dot { background: #6d28d9; }
+    body.theme-blue .typing-dot { background: #3b82f6; }
+    body.theme-purple .typing-dot { background: #a855f7; }
+    body.theme-red .typing-dot { background: #ef4444; }
+
+    .message-bubble-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .message-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 2px;
+      flex-wrap: wrap;
+    }
+
+    .message-author {
+      font-weight: 500;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .message-row.self .message-time {
+      color: #d1d5db;
+    }
+
+    .message-text {
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message-delete-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-soft);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      transition:
+        background-color 120ms ease-out,
+        color 120ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    .message-delete-btn:hover {
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--danger);
+    }
+
+    .message-delete-btn:active {
+      transform: scale(0.96);
+    }
+
+    .empty-state {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-soft);
+      animation: fadeIn 180ms ease-out;
+    }
+
+    .input-area {
+      margin-top: 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-subtle);
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .input-box {
+      flex: 1;
+      border-radius: 14px;
+      border: 1px solid var(--border-subtle);
+      background: var(--input-bg);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .input-box textarea {
+      border: none;
+      outline: none;
+      resize: none;
+      width: 100%;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+      max-height: 80px;
+      min-height: 18px;
+      color: var(--text-main);
+    }
+
+    .input-box textarea::placeholder {
+      color: var(--text-soft);
+    }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pill {
+      border-radius: var(--radius-pill);
+      padding: 2px 8px;
+      border: 1px solid var(--badge-border);
+      background: var(--badge-bg);
+      font-size: 11px;
+      color: var(--text-muted);
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        color 180ms ease-out;
+    }
+
+    .btn {
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-main);
+      transition:
+        background-color 120ms ease-out,
+        border-color 120ms ease-out,
+        color 120ms ease-out,
+        transform 80ms ease-out,
+        box-shadow 80ms ease-out;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      border-color: var(--accent);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-muted);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: #f3f4f6;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+    }
+
+    body.theme-dark .btn:hover:not(:disabled) {
+      background: #111827;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(0.95);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      background: #f3f4f6;
+      border-color: var(--border-subtle);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+    }
+
+    .theme-select-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .theme-select-label {
+      font-size: 12px;
+    }
+
+    .theme-select {
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      padding: 4px 8px;
+      font-size: 12px;
+      color: var(--text-main);
+      outline: none;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        color 180ms ease-out;
+    }
+
+    body.theme-dark .theme-select {
+      background: #020617;
+      color: #e5e7eb;
+      border-color: #111827;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.25);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 160ms ease-out;
+    }
+
+    .modal-backdrop.visible {
+      display: flex;
+      opacity: 1;
+      animation: fadeIn 160ms ease-out;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-modal);
+      padding: 16px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeInScale 180ms ease-out;
+      will-change: transform, opacity;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        box-shadow 180ms ease-out;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--text-soft);
+      transition:
+        color 120ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-close:active {
+      transform: scale(0.9);
+    }
+
+    .modal-tabs {
+      display: flex;
+      border-radius: var(--radius-pill);
+      background: #f3f4f6;
+      padding: 2px;
+      gap: 2px;
+      margin-bottom: 6px;
+      transition:
+        background-color 180ms ease-out;
+    }
+
+    body.theme-dark .modal-tabs {
+      background: #020617;
+    }
+
+    .modal-tab {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      font-size: 13px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition:
+        background-color 120ms ease-out,
+        color 120ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    .modal-tab.active {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .modal-tab:hover {
+      transform: translateY(-1px);
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .field-input {
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      background: var(--input-bg);
+      color: var(--text-main);
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        color 180ms ease-out,
+        box-shadow 120ms ease-out;
+    }
+
+    .field-input:focus {
+      border-color: var(--input-border-focus);
+      box-shadow: 0 0 0 1px var(--input-border-focus);
+    }
+
+    .field-textarea {
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+      background: var(--input-bg);
+      color: var(--text-main);
+      resize: vertical;
+      min-height: 80px;
+      max-height: 200px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out,
+        color 180ms ease-out,
+        box-shadow 120ms ease-out;
+    }
+
+    .field-textarea:focus {
+      border-color: var(--input-border-focus);
+      box-shadow: 0 0 0 1px var(--input-border-focus);
+    }
+
+    .field-input[type="file"] {
+      padding: 4px 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .modal-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .modal-error {
+      font-size: 12px;
+      color: var(--danger);
+      min-height: 16px;
+    }
+
+    .modal-hint {
+      font-size: 11px;
+      color: var(--text-soft);
+      text-align: left;
+    }
+
+    .profile-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .profile-preview-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-pill);
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      position: relative;
+      transition:
+        background-color 180ms ease-out,
+        transform 120ms ease-out;
+    }
+
+    .profile-preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .profile-preview-text {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .profile-inline-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    .admin-badge {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff7a18 0%, #ffd84d 18%, #5eead4 36%, #60a5fa 54%, #a78bfa 72%, #f472b6 86%, #ff7a18 100%);
+      background-size: 200% 100%;
+      color: #0b1020;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      animation: rainbowShift 4s linear infinite;
+      transition:
+        background-color 180ms ease-out,
+        color 180ms ease-out,
+        transform 80ms ease-out;
+    }
+
+    .admin-badge-super {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff7a18 0%, #ffd84d 18%, #5eead4 36%, #60a5fa 54%, #a78bfa 72%, #f472b6 86%, #ff7a18 100%);
+      background-size: 200% 100%;
+      color: #0b1020;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      animation: rainbowShift 4s linear infinite;
+    }
+
+    .admin-badge-super:hover {
+      transform: translateY(-1px);
+    }
+
+    .sidebar-card {
+      flex: 1;
+      border-radius: 0;
+      border-left: 1px solid var(--border-subtle);
+      border-right: none;
+      border-top: none;
+      border-bottom: none;
+      background: var(--bg-surface);
+      padding: 8px 8px 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      transition:
+        background-color 180ms ease-out,
+        border-color 180ms ease-out;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      transition:
+        border-color 180ms ease-out,
+        color 180ms ease-out;
+    }
+
+    .sidebar-title {
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .sidebar-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      scroll-behavior: smooth;
+    }
+
+    .member-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 4px;
+      border-radius: 999px;
+      cursor: default;
+      transition:
+        background-color 120ms ease-out,
+        transform 80ms ease-out;
+      animation: fadeIn 140ms ease-out;
+    }
+
+    .member-row.me {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .member-row:hover {
+      background: rgba(148, 163, 184, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .member-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      transition:
+        background-color 180ms ease-out,
+        transform 120ms ease-out;
+    }
+
+    .member-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .member-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .member-name-line {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+    }
+
+    .member-name {
+      font-size: 12px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .member-email {
+      font-size: 11px;
+      color: var(--text-soft);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .member-status {
+      font-size: 10px;
+      color: var(--danger);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .admin-panel-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 52vh;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .admin-user-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 10px;
+      background: color-mix(in srgb, var(--bg-subtle) 82%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-user-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .admin-user-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .admin-user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .admin-user-email {
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .admin-user-status {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .admin-timeout-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .admin-timeout-grid .btn {
+      justify-content: center;
+      padding-left: 8px;
+      padding-right: 8px;
+      min-height: 32px;
+    }
+
+    @media (max-width: 900px) {
+      .app-main {
+        flex-direction: column;
+      }
+      .sidebar-column {
+        order: -1;
+      }
+      .sidebar-card {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle);
+        padding-left: 8px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        height: 100vh;
+        border-radius: 0;
+      }
+      .app-main {
+        padding: 8px;
+      }
+      .modal {
+        max-width: 100%;
+      }
+    }
+
+    body {
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        /* Tiny dense stars - layer 1 */
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        /* Bright hero stars */
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(255,255,255,0.08) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(200,220,255,0.1) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(255,255,255,0.07) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(220,200,255,0.09) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(255,255,255,0.06) 1.7px, transparent 3px),
+        /* Nebula clouds - galaxy arms */
+        radial-gradient(ellipse 65% 20% at 35% 60%, rgba(80, 110, 255, 0.09), transparent),
+        radial-gradient(ellipse 55% 15% at 70% 35%, rgba(180, 100, 255, 0.07), transparent),
+        radial-gradient(ellipse 40% 25% at 20% 75%, rgba(255, 130, 80, 0.05), transparent),
+        /* Milky Way band */
+        radial-gradient(ellipse 100% 30% at 50% 55%, rgba(140, 160, 255, 0.06), transparent),
+        /* Large nebula glows */
+        radial-gradient(circle at top, rgba(84, 124, 255, 0.22), transparent 35%),
+        radial-gradient(circle at 20% 20%, rgba(255, 167, 94, 0.14), transparent 22%),
+        radial-gradient(circle at 80% 0%, rgba(136, 90, 255, 0.15), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(60, 100, 200, 0.1), transparent 25%),
+        /* Deep space base */
+        linear-gradient(160deg, #04050f 0%, #060918 40%, #030408 70%, #050712 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto,
+        auto, auto, auto, auto, auto, auto, auto, auto, auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    body.theme-light {
+      --star-color: rgba(10, 8, 30, 0.5);
+      --star-color-soft: rgba(10, 8, 30, 0.28);
+      --star-bright: rgba(10, 8, 30, 0.75);
+      background:
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(0,0,0,0.04) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(0,0,0,0.04) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(0,0,0,0.03) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(0,0,0,0.04) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(0,0,0,0.03) 1.7px, transparent 3px),
+        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(60, 40, 120, 0.07), transparent),
+        radial-gradient(circle at top, rgba(80, 60, 180, 0.14), transparent 32%),
+        radial-gradient(circle at 20% 20%, rgba(120, 80, 200, 0.08), transparent 20%),
+        radial-gradient(circle at 80% 10%, rgba(60, 80, 180, 0.07), transparent 22%),
+        linear-gradient(160deg, #f5f0ff 0%, #eeeaff 40%, #f0f4ff 70%, #fafafe 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto;
+    }
+
+    body.theme-dark {
+      --star-color: rgba(255, 255, 255, 0.72);
+      --star-color-soft: rgba(214, 229, 255, 0.38);
+      --star-bright: rgba(255, 255, 255, 0.95);
+      background:
+        /* Dense star field */
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        /* Bright hero stars with glow */
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(255,255,255,0.08) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(200,220,255,0.1) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(255,255,255,0.07) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(220,200,255,0.09) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(255,255,255,0.06) 1.7px, transparent 3px),
+        /* Nebula clouds */
+        radial-gradient(ellipse 65% 20% at 35% 60%, rgba(80, 110, 255, 0.1), transparent),
+        radial-gradient(ellipse 55% 15% at 70% 35%, rgba(180, 100, 255, 0.08), transparent),
+        radial-gradient(ellipse 40% 25% at 20% 75%, rgba(255, 130, 80, 0.06), transparent),
+        radial-gradient(ellipse 100% 30% at 50% 55%, rgba(140, 160, 255, 0.07), transparent),
+        /* Large nebula glows */
+        radial-gradient(circle at top, rgba(84, 124, 255, 0.22), transparent 35%),
+        radial-gradient(circle at 20% 20%, rgba(255, 167, 94, 0.14), transparent 22%),
+        radial-gradient(circle at 80% 0%, rgba(136, 90, 255, 0.15), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(60, 100, 200, 0.1), transparent 25%),
+        linear-gradient(160deg, #04050f 0%, #060918 40%, #030408 70%, #050712 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto,
+        auto, auto, auto, auto, auto, auto, auto, auto, auto;
+    }
+
+    body.theme-blue {
+      --star-color: rgba(255, 255, 255, 0.7);
+      --star-color-soft: rgba(180, 220, 255, 0.45);
+      --star-bright: rgba(255, 255, 255, 0.95);
+      background:
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(0,0,0,0.04) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(0,0,0,0.04) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(0,0,0,0.03) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(0,0,0,0.04) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(0,0,0,0.03) 1.7px, transparent 3px),
+        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(30, 80, 200, 0.1), transparent),
+        radial-gradient(circle at top, rgba(40, 100, 255, 0.25), transparent 32%),
+        radial-gradient(circle at 78% 14%, rgba(100, 180, 255, 0.2), transparent 22%),
+        radial-gradient(circle at 20% 80%, rgba(60, 140, 255, 0.12), transparent 20%),
+        linear-gradient(160deg, #0a1a3a 0%, #0d2050 40%, #071530 70%, #060e22 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto;
+    }
+
+    body.theme-purple {
+      --star-color: rgba(255, 255, 255, 0.72);
+      --star-color-soft: rgba(220, 180, 255, 0.42);
+      --star-bright: rgba(255, 255, 255, 0.95);
+      background:
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(0,0,0,0.04) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(0,0,0,0.04) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(0,0,0,0.03) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(0,0,0,0.04) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(0,0,0,0.03) 1.7px, transparent 3px),
+        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(100, 40, 200, 0.12), transparent),
+        radial-gradient(circle at top, rgba(120, 60, 255, 0.25), transparent 32%),
+        radial-gradient(circle at 22% 18%, rgba(200, 100, 255, 0.18), transparent 22%),
+        radial-gradient(circle at 75% 80%, rgba(80, 40, 180, 0.12), transparent 20%),
+        linear-gradient(160deg, #0d0520 0%, #160838 40%, #0a0318 70%, #080412 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto;
+    }
+
+    body.theme-red {
+      --star-color: rgba(255, 255, 255, 0.68);
+      --star-color-soft: rgba(255, 200, 180, 0.4);
+      --star-bright: rgba(255, 255, 255, 0.95);
+      background:
+        radial-gradient(circle at 3% 7%, var(--star-color) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 9% 14%, var(--star-color) 0 0.9px, transparent 1.5px),
+        radial-gradient(circle at 13% 41%, var(--star-color-soft) 0 0.5px, transparent 0.9px),
+        radial-gradient(circle at 17% 62%, var(--star-color-soft) 0 1.4px, transparent 2.1px),
+        radial-gradient(circle at 22% 88%, var(--star-color) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 29% 28%, var(--star-color) 0 1px, transparent 1.7px),
+        radial-gradient(circle at 34% 53%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 38% 81%, var(--star-color-soft) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 43% 16%, var(--star-color) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 47% 45%, var(--star-color) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle at 52% 72%, var(--star-color-soft) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 57% 35%, var(--star-color) 0 0.85px, transparent 1.5px),
+        radial-gradient(circle at 61% 19%, var(--star-color-soft) 0 1.6px, transparent 2.3px),
+        radial-gradient(circle at 66% 88%, var(--star-color) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 71% 52%, var(--star-color-soft) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 73% 71%, var(--star-color) 0 0.95px, transparent 1.55px),
+        radial-gradient(circle at 78% 24%, var(--star-color) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 83% 67%, var(--star-color-soft) 0 0.5px, transparent 0.95px),
+        radial-gradient(circle at 86% 33%, var(--star-color-soft) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 91% 48%, var(--star-color) 0 0.8px, transparent 1.4px),
+        radial-gradient(circle at 94% 12%, var(--star-color) 0 0.85px, transparent 1.45px),
+        radial-gradient(circle at 97% 78%, var(--star-color-soft) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 5% 55%, var(--star-bright) 0 1.5px, rgba(0,0,0,0.04) 2px, transparent 4px),
+        radial-gradient(circle at 31% 9%, var(--star-bright) 0 1.8px, rgba(0,0,0,0.04) 2.5px, transparent 5px),
+        radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(0,0,0,0.03) 1.8px, transparent 3.5px),
+        radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(0,0,0,0.04) 2.2px, transparent 4.5px),
+        radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(0,0,0,0.03) 1.7px, transparent 3px),
+        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(180, 30, 30, 0.12), transparent),
+        radial-gradient(circle at top, rgba(200, 60, 40, 0.25), transparent 32%),
+        radial-gradient(circle at 75% 12%, rgba(220, 100, 60, 0.18), transparent 22%),
+        radial-gradient(circle at 20% 80%, rgba(160, 40, 40, 0.12), transparent 20%),
+        linear-gradient(160deg, #1a0505 0%, #280808 40%, #150303 70%, #100202 100%);
+      background-size:
+        190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
+        390px 390px, 300px 300px, 560px 560px, 340px 340px, 430px 430px,
+        500px 500px, 410px 410px, 620px 620px, 460px 460px, 550px 550px,
+        510px 510px, 480px 480px, 420px 420px, 710px 710px, 580px 580px,
+        610px 610px, 530px 530px,
+        auto, auto, auto, auto, auto;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(18px);
+      opacity: 0.72;
+      z-index: 0;
+    }
+
+    body::before {
+      inset: -10%;
+      border-radius: 0;
+      filter: none;
+      opacity: 0.65;
+      background:
+        /* Twinkling layer - more stars, varied brightness */
+        radial-gradient(circle at 4% 9%, rgba(255,255,255,0.95) 0 0.7px, rgba(200,220,255,0.12) 1.2px, transparent 2.5px),
+        radial-gradient(circle at 7% 22%, rgba(255,255,255,0.9) 0 0.8px, transparent 1.5px),
+        radial-gradient(circle at 11% 48%, rgba(255,220,180,0.85) 0 0.6px, transparent 1.2px),
+        radial-gradient(circle at 16% 83%, rgba(255,255,255,0.7) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 23% 38%, rgba(200,215,255,0.88) 0 1.0px, transparent 1.8px),
+        radial-gradient(circle at 23% 78%, rgba(255,255,255,0.55) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 28% 12%, rgba(255,255,255,0.75) 0 0.65px, transparent 1.3px),
+        radial-gradient(circle at 35% 64%, rgba(180,200,255,0.6) 0 0.8px, transparent 1.5px),
+        radial-gradient(circle at 41% 31%, rgba(255,255,255,0.82) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 45% 87%, rgba(255,240,200,0.7) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 53% 19%, rgba(255,255,255,0.78) 0 0.75px, transparent 1.4px),
+        radial-gradient(circle at 58% 57%, rgba(255,255,255,0.5) 0 1.2px, transparent 2px),
+        radial-gradient(circle at 64% 42%, rgba(200,230,255,0.65) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 69% 76%, rgba(255,255,255,0.6) 0 0.85px, transparent 1.55px),
+        radial-gradient(circle at 74% 28%, rgba(255,220,255,0.55) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 79% 18%, rgba(255,255,255,0.75) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 85% 61%, rgba(200,215,255,0.5) 0 0.8px, transparent 1.45px),
+        radial-gradient(circle at 88% 72%, rgba(255,255,255,0.45) 0 1.3px, transparent 2.1px),
+        radial-gradient(circle at 93% 34%, rgba(255,255,255,0.8) 0 0.65px, transparent 1.25px),
+        radial-gradient(circle at 97% 55%, rgba(180,210,255,0.55) 0 0.9px, transparent 1.6px);
+      background-size:
+        580px 580px, 540px 540px, 460px 460px, 700px 700px, 620px 620px,
+        760px 760px, 500px 500px, 810px 810px, 640px 640px, 720px 720px,
+        570px 570px, 900px 900px, 650px 650px, 840px 840px, 730px 730px,
+        700px 700px, 880px 880px, 980px 980px, 590px 590px, 760px 760px;
+      animation: starDriftSlow 22s ease-in-out infinite, twinkle 8s ease-in-out infinite;
+    }
+
+    body::after {
+      inset: -6%;
+      border-radius: 0;
+      background:
+        /* Nebula color clouds - galaxy depth */
+        radial-gradient(ellipse 80% 35% at 30% 50%, rgba(70, 100, 255, 0.09), transparent),
+        radial-gradient(ellipse 60% 20% at 75% 30%, rgba(200, 100, 255, 0.08), transparent),
+        radial-gradient(ellipse 50% 28% at 55% 80%, rgba(255, 120, 60, 0.05), transparent),
+        radial-gradient(circle at 18% 10%, rgba(122, 160, 255, 0.24), transparent 20%),
+        radial-gradient(circle at 72% 18%, rgba(255, 145, 77, 0.18), transparent 22%),
+        radial-gradient(circle at 51% 84%, rgba(168, 116, 255, 0.14), transparent 24%),
+        radial-gradient(circle at 90% 60%, rgba(80, 160, 255, 0.1), transparent 18%),
+        /* Extra twinkling stars - slowest layer */
+        radial-gradient(circle at 12% 65%, rgba(255,255,255,0.25) 0 1.4px, transparent 2px),
+        radial-gradient(circle at 37% 22%, rgba(255,240,200,0.2) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 62% 71%, rgba(200,220,255,0.22) 0 1.0px, transparent 1.7px),
+        radial-gradient(circle at 82% 54%, rgba(255,255,255,0.18) 0 1px, transparent 1.6px);
+      filter: blur(0.3px);
+      opacity: 0.85;
+      animation: starDriftFast 30s ease-in-out infinite, twinkleSlow 12s ease-in-out infinite;
+    }
+
+    body.theme-light::before {
+      opacity: 0.55;
+      background:
+        radial-gradient(circle at 7% 22%, rgba(10,8,30,0.6) 0 0.8px, transparent 1.5px),
+        radial-gradient(circle at 23% 78%, rgba(10,8,30,0.38) 0 1.1px, transparent 1.8px),
+        radial-gradient(circle at 41% 31%, rgba(10,8,30,0.55) 0 0.7px, transparent 1.3px),
+        radial-gradient(circle at 58% 57%, rgba(10,8,30,0.32) 0 1.2px, transparent 2px),
+        radial-gradient(circle at 79% 18%, rgba(10,8,30,0.52) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 88% 72%, rgba(10,8,30,0.28) 0 1.3px, transparent 2.1px),
+        radial-gradient(circle at 33% 44%, rgba(10,8,30,0.45) 0 0.65px, transparent 1.2px),
+        radial-gradient(circle at 65% 90%, rgba(10,8,30,0.35) 0 0.9px, transparent 1.6px),
+        radial-gradient(circle at 15% 60%, rgba(10,8,30,0.5) 0 0.75px, transparent 1.35px),
+        radial-gradient(circle at 90% 35%, rgba(10,8,30,0.4) 0 0.8px, transparent 1.45px);
+      background-size: 540px 540px, 760px 760px, 640px 640px, 900px 900px, 700px 700px, 980px 980px, 580px 580px, 820px 820px, 660px 660px, 730px 730px;
+    }
+
+    body.theme-light::after {
+      background:
+        radial-gradient(ellipse 80% 30% at 40% 55%, rgba(60,40,160,0.06), transparent),
+        radial-gradient(circle at 18% 10%, rgba(80,60,180,0.1), transparent 18%),
+        radial-gradient(circle at 72% 18%, rgba(100,70,200,0.08), transparent 20%),
+        radial-gradient(circle at 51% 84%, rgba(60,40,160,0.07), transparent 22%),
+        radial-gradient(circle at 12% 65%, rgba(10,8,30,0.2) 0 1.4px, transparent 2px),
+        radial-gradient(circle at 82% 54%, rgba(10,8,30,0.18) 0 1px, transparent 1.6px),
+        radial-gradient(circle at 48% 28%, rgba(10,8,30,0.15) 0 1.1px, transparent 1.8px);
+      opacity: 0.7;
+    }
+
+    @keyframes horizonSpin {
+      from { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(180deg) scale(1.04); }
+      to { transform: rotate(360deg) scale(1); }
+    }
+
+    @keyframes horizonPulse {
+      0%, 100% { transform: scale(0.96); opacity: 0.62; }
+      50% { transform: scale(1.08); opacity: 0.9; }
+    }
+
+    @keyframes horizonOrbit {
+      from { transform: rotate(0deg) translateX(7px) rotate(0deg); }
+      to { transform: rotate(360deg) translateX(7px) rotate(-360deg); }
+    }
+
+    @keyframes horizonShimmer {
+      0%, 100% { opacity: 0.45; filter: blur(0.4px) saturate(1); }
+      50% { opacity: 0.9; filter: blur(1.1px) saturate(1.25); }
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      backdrop-filter: blur(16px);
+      background: var(--bg-surface);
+      border-color: var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .app-header,
+    .channel-header,
+    .input-area,
+    .sidebar-card,
+    .messages,
+    .status-banner {
+      border-color: var(--border-subtle);
+    }
+
+    .app-title-main {
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .channel-header {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(18, 22, 42, 0.95), rgba(8, 11, 24, 0.88));
+    }
+
+    body.theme-light .channel-header,
+    body.theme-blue .channel-header,
+    body.theme-purple .channel-header,
+    body.theme-red .channel-header {
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--bg-subtle) 86%, white), color-mix(in srgb, var(--accent-soft) 45%, white));
+    }
+
+    .messages {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(92, 118, 255, 0.08), transparent 28%),
+        radial-gradient(circle at 80% 20%, rgba(255, 145, 77, 0.06), transparent 24%),
+        var(--bg-surface);
+    }
+
+    .message-bubble {
+      background: color-mix(in srgb, var(--bg-subtle) 84%, transparent);
+      border: 1px solid rgba(130, 154, 255, 0.12);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ff8a3d 0%, #ffca69 24%, #8aa9ff 72%, #5b4bff 100%);
+      color: #050712;
+      border-color: transparent;
+    }
+
+    .input-box,
+    .theme-select,
+    .field-input,
+    .field-textarea,
+    .modal {
+      background: var(--input-bg);
+      border-color: var(--border-subtle);
+    }
+
+    .btn:hover:not(:disabled),
+    .btn-ghost:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+    }
+
+    .input-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .attach-input {
+      display: none;
+    }
+
+    .attach-preview {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(138, 169, 255, 0.18);
+      background: color-mix(in srgb, var(--bg-subtle) 76%, transparent);
+    }
+
+    .attach-preview.visible {
+      display: flex;
+    }
+
+    .attach-preview-thumb {
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      flex-shrink: 0;
+    }
+
+    .attach-preview-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .attach-preview-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+
+    .attach-preview-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .message-image-wrap {
+      margin-top: 6px;
+    }
+
+    .message-image-link {
+      display: block;
+      text-decoration: none;
+    }
+
+    .message-image {
+      display: block;
+      max-width: min(320px, 100%);
+      max-height: 320px;
+      width: auto;
+      height: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      object-fit: cover;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .message-file-label {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .message-row.self .message-file-label {
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    @media (max-width: 640px) {
+      .message-bubble {
+        max-width: 86%;
+      }
+
+      .attach-preview-name {
+        max-width: 150px;
+      }
+    }
+
+    /* ── iOS-style send animation ── */
+    @keyframes iosSendFly {
+      0%   { transform: translateY(0) scale(1);   opacity: 1; }
+      30%  { transform: translateY(-4px) scale(1.04); opacity: 1; }
+      100% { transform: translateY(-72px) scale(0.6); opacity: 0; }
+    }
+
+    @keyframes iosSendTrail {
+      0%   { transform: scaleY(1); opacity: 0.35; }
+      100% { transform: scaleY(0); opacity: 0; }
+    }
+
+    @keyframes sendBtnPop {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(0.86); }
+      65%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    .send-clone {
+      position: fixed;
+      pointer-events: none;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 9999;
+      white-space: nowrap;
+      overflow: hidden;
+      color: #050712;
+      background: linear-gradient(135deg, #ff8a3d 0%, #ffca69 24%, #8aa9ff 72%, #5b4bff 100%);
+      animation: iosSendFly 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    .send-btn-popping {
+      animation: sendBtnPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* ── Changelog "What's new" tab button ── */
+    .whats-new-btn {
+      position: relative;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      padding: 5px 13px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-main);
+      letter-spacing: 0.01em;
+      transition:
+        background-color 120ms ease-out,
+        border-color 120ms ease-out,
+        color 120ms ease-out,
+        transform 80ms ease-out,
+        box-shadow 80ms ease-out;
+    }
+    .whats-new-btn:hover {
+      background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+      box-shadow: 0 2px 6px rgba(15,23,42,0.12);
+    }
+    .whats-new-btn:active {
+      transform: scale(0.97);
+    }
+    /* Gradient shimmer on button when there's an unseen update */
+    .whats-new-btn.has-update {
+      background: linear-gradient(135deg, #ff8a3d 0%, #ffca69 24%, #8aa9ff 72%, #5b4bff 100%);
+      border-color: transparent;
+      color: #050712;
+      box-shadow: 0 2px 12px rgba(91,75,255,0.35);
+    }
+    .whats-new-btn.has-update:hover {
+      filter: brightness(1.08);
+      background: linear-gradient(135deg, #ff8a3d 0%, #ffca69 24%, #8aa9ff 72%, #5b4bff 100%);
+    }
+    /* Pulsing dot badge */
+    .whats-new-dot {
+      display: none;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      flex-shrink: 0;
+      animation: dotPulse 1.8s ease-in-out infinite;
+    }
+    .whats-new-btn.has-update .whats-new-dot {
+      display: block;
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.55; transform: scale(0.7); }
+    }
+
+    /* ── Changelog modal ── */
+
+    .changelog-modal {
+      max-width: 520px;
+    }
+
+    .changelog-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .changelog-entry {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .changelog-entry:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .changelog-version {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .changelog-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+
+    .changelog-date {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .changelog-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .changelog-notes {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body class="theme-dark">
+  <canvas id="galaxy-canvas" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-title">
+        <div class="app-title-main">O R B I T</div>
+        <div class="app-title-sub">s i m p l i c i t y</div>
+      </div>
+
+      <div class="app-right">
+        <div class="theme-select-wrapper">
+          <span class="theme-select-label">Theme</span>
+          <select id="themeSelect" class="theme-select">
+            <option value="light">Inversion White</option>
+            <option value="dark">Void Darkness</option>
+            <option value="blue">Nebula Blue</option>
+            <option value="purple">Supernova Purple</option>
+            <option value="red">Hydrogen Red</option>
+          </select>
+        </div>
+
+        <button class="whats-new-btn" id="changelogBtn" type="button">
+          <span class="whats-new-dot"></span>
+          What's new
+        </button>
+
+        <div class="app-user" id="profileTrigger">
+          <div class="avatar" id="userAvatar">
+            <span id="userAvatarInitials">?</span>
+          </div>
+          <div class="app-user-label-wrapper">
+            <span class="app-user-label-main" id="userLabel">
+              Not signed in
+            </span>
+            <span class="app-user-label-sub" id="userLabelSub">Click to edit profile</span>
+          </div>
+          <button class="btn btn-primary" id="authBtn">Sign in</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="status-banner" id="statusBanner">
+      Sign in to start chatting.
+    </div>
+
+    <main class="app-main">
+      <div class="main-column">
+        <section class="channel-header">
+          <div class="channel-info">
+            <div class="channel-name"># general</div>
+            <div class="channel-desc">Drift text and images through the event horizon.</div>
+          </div>
+          <div class="channel-meta" id="presenceLabel"></div>
+        </section>
+
+        <section class="messages" id="messages"></section>
+        <div class="typing-indicator hidden" id="typingIndicator">
+          <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+          <span id="typingLabel"></span>
+        </div>
+
+        <div class="empty-state" id="emptyState" style="display:none;">
+          No messages yet. Say hi 👋
+        </div>
+
+        <section class="input-area">
+          <div class="attach-preview" id="attachPreview">
+            <img class="attach-preview-thumb" id="attachPreviewThumb" alt="Selected image preview" />
+            <div class="attach-preview-meta">
+              <div class="attach-preview-name" id="attachPreviewName"></div>
+              <div class="attach-preview-sub" id="attachPreviewSub">Ready to send</div>
+            </div>
+            <button class="btn btn-ghost" id="clearAttachBtn" type="button">Remove</button>
+          </div>
+          <div class="input-row">
+            <div class="input-tools">
+              <input
+                type="file"
+                id="imageInput"
+                class="attach-input"
+                accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif"
+              />
+              <button class="btn btn-ghost" id="attachBtn" type="button">Attach image</button>
+            </div>
+            <div class="input-box">
+              <textarea
+                id="messageInput"
+                rows="1"
+                placeholder="Message #general"
+              ></textarea>
+            </div>
+            <button class="btn btn-primary" id="sendBtn">SEND</button>
+          </div>
+          <div class="input-hint">
+            <span>Press Enter to send • PNG, JPEG, GIF supported</span>
+            <span class="pill" id="inputStatePill">Signed out</span>
+          </div>
+        </section>
+      </div>
+
+      <aside class="sidebar-column">
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <span class="sidebar-title">Members</span>
+            <div class="sidebar-header-actions">
+              <button class="btn btn-ghost" id="adminPanelBtn" type="button" style="display:none;">Admin Panel</button>
+              <span id="memberCountLabel">0</span>
+            </div>
+          </div>
+          <div class="sidebar-body" id="membersList"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-backdrop" id="authModalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="authModalTitle">Sign in</div>
+        <button class="modal-close" id="authModalClose" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-tabs">
+        <div class="modal-tab active" id="tabSignIn">Sign in</div>
+        <div class="modal-tab" id="tabSignUp">Sign up</div>
+      </div>
+
+      <div class="modal-body">
+        <div class="field" id="nameField" style="display:none;">
+          <label class="field-label" for="nameInput">Display name</label>
+          <input type="text" id="nameInput" class="field-input" placeholder="e.g. Alex" autocomplete="name" />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="emailInput">Email</label>
+          <input type="email" id="emailInput" class="field-input" placeholder="you@example.com" autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="passwordInput">Password</label>
+          <input type="password" id="passwordInput" class="field-input" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        <div class="field" id="confirmField" style="display:none;">
+          <label class="field-label" for="confirmInput">Confirm password</label>
+          <input type="password" id="confirmInput" class="field-input" placeholder="••••••••" autocomplete="new-password" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="modal-error" id="authError"></div>
+        <button class="btn btn-primary" id="authSubmitBtn">Continue</button>
+        <button class="btn btn-ghost" id="authCancelBtn">Cancel</button>
+        <div class="modal-hint" id="authHint">
+          Use a valid email and a password with at least 6 characters.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div class="modal-backdrop" id="profileModalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="profileModalTitle">Edit profile</div>
+        <button class="modal-close" id="profileModalClose" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="profile-preview">
+          <div class="profile-preview-avatar" id="profilePreviewAvatar">
+            <span id="profilePreviewInitials">?</span>
+          </div>
+          <div class="profile-preview-text" id="profilePreviewText">
+            This is how your avatar will appear in chat.
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="profileNameInput">Display name</label>
+          <input
+            type="text"
+            id="profileNameInput"
+            class="field-input"
+            placeholder="e.g. Alex"
+            autocomplete="name"
+          />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="profileFileInput">Profile picture (optional)</label>
+          <input
+            type="file"
+            id="profileFileInput"
+            class="field-input"
+            accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+          />
+          <div class="profile-inline-actions">
+            <button class="btn btn-ghost" id="profileClearImageBtn" type="button">Remove picture</button>
+            <button class="btn btn-ghost" id="profilePasteBase64Btn" type="button">Paste base64 manually</button>
+          </div>
+        </div>
+
+        <div class="field" id="profileBase64Field" style="display:none;">
+          <label class="field-label" for="profileBase64Input">Base64 data URL</label>
+          <textarea
+            id="profileBase64Input"
+            class="field-textarea"
+            placeholder="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="modal-error" id="profileError"></div>
+        <button class="btn btn-primary" id="profileSaveBtn">Save profile</button>
+        <button class="btn btn-ghost" id="profileCancelBtn">Cancel</button>
+        <div class="modal-hint">
+          Your profile is stored in Firestore under <code>users/&lt;uid&gt;</code>. Messages always use the latest profile.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="adminModalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle" style="max-width:640px;">
+      <div class="modal-header">
+        <div class="modal-title" id="adminModalTitle">Admin panel</div>
+        <button class="modal-close" id="adminModalClose" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-hint" id="adminModalHint">
+          Manage member timeouts. Admin accounts cannot be timed out here.
+        </div>
+        <div class="admin-panel-list" id="adminPanelList"></div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="modal-error" id="adminModalError"></div>
+        <button class="btn btn-ghost" id="adminModalCancelBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirmModalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" style="max-width:420px;">
+      <div class="modal-header">
+        <div class="modal-title" id="confirmModalTitle">Confirm delete</div>
+        <button class="modal-close" id="confirmModalClose" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-hint" id="confirmModalMessage">Delete this message?</div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-error" id="confirmModalError"></div>
+        <button class="btn btn-primary" id="confirmModalConfirmBtn" type="button">Delete</button>
+        <button class="btn btn-ghost" id="confirmModalCancelBtn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Changelog Modal -->
+  <div class="modal-backdrop" id="changelogModalBackdrop">
+    <div class="modal changelog-modal" role="dialog" aria-modal="true" aria-labelledby="changelogModalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="changelogModalTitle">What's new in ORBIT</div>
+        <button class="modal-close" id="changelogModalClose" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="changelog-list" id="changelogList">
+          <!-- ════════════════════════════════════════════
+               CHANGELOG — edit entries below freely.
+               Add new entries at the TOP of this list.
+               Each entry uses this structure:
+
+          <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="changelog-tag">v1.x</span>
+              <span class="changelog-date">Month YYYY</span>
+            </div>
+            <div class="changelog-title">Short headline</div>
+            <div class="changelog-notes">Description of what changed.</div>
+          </div>
+
+               ════════════════════════════════════════════ -->
+
+                    <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="changelog-tag">v0.50</span>
+              <span class="changelog-date">April 27, 2026</span>
+            </div>
+            <div class="changelog-title">Send animation</div>
+            <div class="changelog-notes">Messages now launch with a satisfying flight animation when sent. It also now says who's typing and when.</div>
+          </div>
+
+          <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="changelog-tag">v0.11</span>
+              <span class="changelog-date">April 27, 2026</span>
+            </div>
+            <div class="changelog-title">Galaxy background & themes</div>
+            <div class="changelog-notes">Added an animated galaxy canvas with shooting stars, twinkling, and Milky Way nebula bands. Five themes: Void Darkness, Inversion White, Nebula Blue, Supernova Purple, and Hydrogen Red.</div>
+          </div>
+
+          <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="changelog-tag">v0.1</span>
+              <span class="changelog-date">April 27, 2026</span>
+            </div>
+            <div class="changelog-title">Admin panel & timeouts</div>
+            <div class="changelog-notes">Admins can now timeout members for 1m, 5m, 10m, 1h, 5h, or 10h. Timed-out users see a status message and cannot send messages until the timeout expires.</div>
+          </div>
+
+          <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="changelog-tag">v0.0</span>
+              <span class="changelog-date">April 26, 2026</span>
+            </div>
+            <div class="changelog-title">Initial launch</div>
+            <div class="changelog-notes">ORBIT started development with real-time Firebase chat, user profiles with custom avatars, image attachments with compression, and a typing indicator.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="changelogModalCloseBtn" type="button" disabled>Got it <span id="changelogCountdown">(5)</span></button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD4rfKO1U_LAxKyrIrQuRXeI1saokMInhA",
+      authDomain: "orangefox-ce8b1.firebaseapp.com",
+      projectId: "orangefox-ce8b1",
+      storageBucket: "orangefox-ce8b1.firebasestorage.app",
+      messagingSenderId: "859089557525",
+      appId: "1:859089557525:web:2852c1975458b867cc561c",
+      measurementId: "G-LLB6S2MVB5"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const ADMIN_EMAIL = "adminsecret@orangefox.com";
+
+    const authBtn = document.getElementById("authBtn");
+    const userLabel = document.getElementById("userLabel");
+    const userLabelSub = document.getElementById("userLabelSub");
+    const userAvatar = document.getElementById("userAvatar");
+    const userAvatarInitials = document.getElementById("userAvatarInitials");
+    const profileTrigger = document.getElementById("profileTrigger");
+    const statusBanner = document.getElementById("statusBanner");
+    const messagesEl = document.getElementById("messages");
+    const emptyStateEl = document.getElementById("emptyState");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const attachBtn = document.getElementById("attachBtn");
+    const imageInput = document.getElementById("imageInput");
+    const attachPreview = document.getElementById("attachPreview");
+    const attachPreviewThumb = document.getElementById("attachPreviewThumb");
+    const attachPreviewName = document.getElementById("attachPreviewName");
+    const attachPreviewSub = document.getElementById("attachPreviewSub");
+    const clearAttachBtn = document.getElementById("clearAttachBtn");
+    const inputStatePill = document.getElementById("inputStatePill");
+    const themeSelect = document.getElementById("themeSelect");
+
+    const membersList = document.getElementById("membersList");
+    const memberCountLabel = document.getElementById("memberCountLabel");
+    const adminPanelBtn = document.getElementById("adminPanelBtn");
+
+    const authModalBackdrop = document.getElementById("authModalBackdrop");
+    const authModalClose = document.getElementById("authModalClose");
+    const authCancelBtn = document.getElementById("authCancelBtn");
+    const authSubmitBtn = document.getElementById("authSubmitBtn");
+    const authError = document.getElementById("authError");
+    const authHint = document.getElementById("authHint");
+    const tabSignIn = document.getElementById("tabSignIn");
+    const tabSignUp = document.getElementById("tabSignUp");
+    const nameField = document.getElementById("nameField");
+    const confirmField = document.getElementById("confirmField");
+    const nameInput = document.getElementById("nameInput");
+    const emailInput = document.getElementById("emailInput");
+    const passwordInput = document.getElementById("passwordInput");
+    const confirmInput = document.getElementById("confirmInput");
+
+    const profileModalBackdrop = document.getElementById("profileModalBackdrop");
+    const profileModalClose = document.getElementById("profileModalClose");
+    const profileCancelBtn = document.getElementById("profileCancelBtn");
+    const profileSaveBtn = document.getElementById("profileSaveBtn");
+    const profileError = document.getElementById("profileError");
+    const profileNameInput = document.getElementById("profileNameInput");
+    const profileFileInput = document.getElementById("profileFileInput");
+    const profileBase64Field = document.getElementById("profileBase64Field");
+    const profileBase64Input = document.getElementById("profileBase64Input");
+    const profileClearImageBtn = document.getElementById("profileClearImageBtn");
+    const profilePasteBase64Btn = document.getElementById("profilePasteBase64Btn");
+    const profilePreviewAvatar = document.getElementById("profilePreviewAvatar");
+    const profilePreviewInitials = document.getElementById("profilePreviewInitials");
+    const profilePreviewText = document.getElementById("profilePreviewText");
+    const adminModalBackdrop = document.getElementById("adminModalBackdrop");
+    const adminModalClose = document.getElementById("adminModalClose");
+    const adminModalCancelBtn = document.getElementById("adminModalCancelBtn");
+    const adminPanelList = document.getElementById("adminPanelList");
+    const adminModalError = document.getElementById("adminModalError");
+    const confirmModalBackdrop = document.getElementById("confirmModalBackdrop");
+    const confirmModalClose = document.getElementById("confirmModalClose");
+    const confirmModalCancelBtn = document.getElementById("confirmModalCancelBtn");
+    const confirmModalConfirmBtn = document.getElementById("confirmModalConfirmBtn");
+    const confirmModalMessage = document.getElementById("confirmModalMessage");
+    const confirmModalError = document.getElementById("confirmModalError");
+    const changelogModalBackdrop = document.getElementById("changelogModalBackdrop");
+
+    let currentUser = null;
+    let currentProfile = { displayName: null, photoData: null, isAdmin: false, timeoutUntil: null };
+    let unsubscribeMessages = null;
+    let unsubscribeMembers = null;
+    let authMode = "signin";
+
+    let userCache = {};
+    let lastMessageSnapshot = null;
+    let pendingAttachment = null;
+    let attachmentPreviewUrl = null;
+    let pendingDeleteRequest = null;
+
+    const THEME_KEY = "chat_theme";
+    const MAX_MESSAGE_IMAGE_BYTES = 12 * 1024 * 1024;
+    const MAX_MESSAGE_IMAGE_DATA_BYTES = 850 * 1024;
+    const MAX_IMAGE_DIMENSION = 1600;
+    const MESSAGE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/gif"];
+    const TIMEOUT_OPTIONS = [
+      { label: "1m", ms: 1 * 60 * 1000 },
+      { label: "5m", ms: 5 * 60 * 1000 },
+      { label: "10m", ms: 10 * 60 * 1000 },
+      { label: "1h", ms: 1 * 60 * 60 * 1000 },
+      { label: "5h", ms: 5 * 60 * 60 * 1000 },
+      { label: "10h", ms: 10 * 60 * 60 * 1000 }
+    ];
+
+    function applyTheme(theme) {
+      const body = document.body;
+      body.classList.remove("theme-light", "theme-dark", "theme-blue", "theme-purple", "theme-red");
+      switch (theme) {
+        case "dark":
+          body.classList.add("theme-dark");
+          break;
+        case "blue":
+          body.classList.add("theme-blue");
+          break;
+        case "purple":
+          body.classList.add("theme-purple");
+          break;
+        case "red":
+          body.classList.add("theme-red");
+          break;
+        case "light":
+        default:
+          body.classList.add("theme-light");
+          theme = "light";
+          break;
+      }
+      themeSelect.value = theme;
+      try {
+        localStorage.setItem(THEME_KEY, theme);
+      } catch (e) {}
+    }
+
+    function initTheme() {
+      let stored = null;
+      try {
+        stored = localStorage.getItem(THEME_KEY);
+      } catch (e) {
+        stored = null;
+      }
+      if (!stored) stored = "dark";
+      applyTheme(stored);
+    }
+
+    function initialsFromName(name, fallback) {
+      if (!name && fallback) return initialsFromName(fallback, null);
+      if (!name) return "?";
+      const parts = name.trim().split(/\s+/);
+      const letters = parts.map(p => p[0]).join("");
+      return letters.slice(0, 2).toUpperCase();
+    }
+
+    function formatTime(ts) {
+      if (!ts) return "";
+      const d = ts.toDate ? ts.toDate() : ts;
+      const h = String(d.getHours()).padStart(2, "0");
+      const m = String(d.getMinutes()).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    function asMillis(value) {
+      if (!value) return null;
+      if (typeof value === "number") return value;
+      if (value.toMillis) return value.toMillis();
+      if (value.toDate) return value.toDate().getTime();
+      return null;
+    }
+
+    function isTimedOut(timeoutUntil) {
+      const ms = asMillis(timeoutUntil);
+      return !!ms && ms > Date.now();
+    }
+
+    function formatDuration(ms) {
+      const totalMinutes = Math.ceil(ms / 60000);
+      if (totalMinutes < 60) return `${totalMinutes}m`;
+      const totalHours = Math.ceil(totalMinutes / 60);
+      return `${totalHours}h`;
+    }
+
+    function formatTimeoutStatus(timeoutUntil) {
+      const ms = asMillis(timeoutUntil);
+      if (!ms || ms <= Date.now()) return "Active";
+      return `Timed out for ${formatDuration(ms - Date.now())}`;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function resetAttachment() {
+      if (attachmentPreviewUrl && attachmentPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(attachmentPreviewUrl);
+      }
+      attachmentPreviewUrl = null;
+      pendingAttachment = null;
+      imageInput.value = "";
+      attachPreview.classList.remove("visible");
+      attachPreviewThumb.removeAttribute("src");
+      attachPreviewName.textContent = "";
+      attachPreviewSub.textContent = "Ready to send";
+    }
+
+    function showAttachmentPreview(file, previewUrl) {
+      attachPreviewThumb.src = previewUrl;
+      attachPreviewName.textContent = file.name;
+      attachPreviewSub.textContent = `${file.type || "image"} • ${formatBytes(file.size)}`;
+      attachPreview.classList.add("visible");
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read image."));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function estimateDataUrlBytes(dataUrl) {
+      const commaIndex = dataUrl.indexOf(",");
+      if (commaIndex === -1) return dataUrl.length;
+      const base64Part = dataUrl.slice(commaIndex + 1);
+      return Math.ceil(base64Part.length * 0.75);
+    }
+
+    function loadImageFromDataUrl(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to decode image."));
+        img.src = dataUrl;
+      });
+    }
+
+    function drawImageToCanvas(img, maxDimension) {
+      const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+      const width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+      const height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas;
+    }
+
+    async function compressImageToDataUrl(file) {
+      const originalDataUrl = await readFileAsDataUrl(file);
+
+      if (file.type === "image/gif") {
+        const gifBytes = estimateDataUrlBytes(originalDataUrl);
+        if (gifBytes > MAX_MESSAGE_IMAGE_DATA_BYTES) {
+          throw new Error("GIF is too large for inline base64 chat. Try a smaller GIF.");
+        }
+        return originalDataUrl;
+      }
+
+      const img = await loadImageFromDataUrl(originalDataUrl);
+      let workingDimension = Math.min(
+        MAX_IMAGE_DIMENSION,
+        Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height)
+      );
+
+      while (workingDimension >= 240) {
+        const canvas = drawImageToCanvas(img, workingDimension);
+
+        if (file.type === "image/png") {
+          const pngDataUrl = canvas.toDataURL("image/png");
+          if (estimateDataUrlBytes(pngDataUrl) <= MAX_MESSAGE_IMAGE_DATA_BYTES) {
+            return pngDataUrl;
+          }
+        }
+
+        for (const quality of [0.88, 0.78, 0.68, 0.58, 0.48, 0.38]) {
+          const jpegDataUrl = canvas.toDataURL("image/jpeg", quality);
+          if (estimateDataUrlBytes(jpegDataUrl) <= MAX_MESSAGE_IMAGE_DATA_BYTES) {
+            return jpegDataUrl;
+          }
+        }
+
+        workingDimension = Math.floor(workingDimension * 0.82);
+      }
+
+      throw new Error("Image is still too large after compression. Try a smaller image.");
+    }
+
+    function isAdminEmail(email) {
+      return email && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    }
+
+    function isSuperAdminEmail(email) {
+      return email && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    }
+
+    function createAdminBadge(isSuper = false) {
+      const span = document.createElement("span");
+      span.className = isSuper ? "admin-badge-super" : "admin-badge";
+      span.textContent = "ADMIN";
+      return span;
+    }
+
+    function applyChatAccessState() {
+      const timedOut = isTimedOut(currentProfile.timeoutUntil);
+      const isAdmin = !!currentProfile.isAdmin;
+      const canChat = !!currentUser && !timedOut;
+
+      messageInput.disabled = !canChat;
+      sendBtn.disabled = !canChat;
+      attachBtn.disabled = !canChat;
+      imageInput.disabled = !canChat;
+      adminPanelBtn.style.display = currentUser && isAdmin ? "inline-flex" : "none";
+
+      if (!currentUser) {
+        inputStatePill.textContent = "Signed out";
+        statusBanner.textContent = "Sign in to start chatting.";
+        return;
+      }
+
+      if (timedOut) {
+        inputStatePill.textContent = "Timed out";
+        statusBanner.textContent = `You are timed out. ${formatTimeoutStatus(currentProfile.timeoutUntil)}.`;
+        return;
+      }
+
+      statusBanner.textContent = "You are signed in. Start chatting.";
+      inputStatePill.textContent = isAdmin ? "Signed in • Admin" : "Signed in";
+    }
+
+    function setAvatarElement(el, initialsEl, photoData, displayName, email) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.style.backgroundImage = "";
+      el.style.backgroundSize = "";
+      el.style.backgroundPosition = "";
+      el.style.backgroundColor = "var(--accent-soft)";
+
+      if (photoData) {
+        const img = document.createElement("img");
+        img.src = photoData;
+        img.alt = displayName || email || "avatar";
+        img.className = "avatar-img";
+        el.appendChild(img);
+      } else {
+        const span = document.createElement("span");
+        span.textContent = initialsFromName(displayName, email);
+        if (initialsEl) initialsEl.textContent = span.textContent;
+        el.appendChild(span);
+      }
+    }
+
+    function setSignedInUI(user) {
+      currentUser = user;
+      const label =
+        currentProfile.displayName || user.displayName || user.email || "User";
+      const isAdmin = isAdminEmail(user.email);
+      const isSuper = isSuperAdminEmail(user.email);
+
+      userLabel.innerHTML = "";
+      const labelText = document.createElement("span");
+      labelText.textContent = label;
+      userLabel.appendChild(labelText);
+      if (isAdmin) {
+        userLabel.appendChild(createAdminBadge(isSuper));
+      }
+
+      userLabelSub.textContent = "Click to edit profile";
+      authBtn.textContent = "Sign out";
+      setAvatarElement(
+        userAvatar,
+        userAvatarInitials,
+        currentProfile.photoData,
+        label,
+        user.email
+      );
+      applyChatAccessState();
+    }
+
+    function setSignedOutUI() {
+      currentUser = null;
+      currentProfile = { displayName: null, photoData: null, isAdmin: false, timeoutUntil: null };
+      userLabel.textContent = "Not signed in";
+      userLabelSub.textContent = "Click to edit profile";
+      authBtn.textContent = "Sign in";
+      statusBanner.textContent = "Sign in to start chatting.";
+      inputStatePill.textContent = "Signed out";
+      messageInput.disabled = true;
+      sendBtn.disabled = true;
+      attachBtn.disabled = true;
+      imageInput.disabled = true;
+      adminPanelBtn.style.display = "none";
+      closeAdminModal();
+      closeConfirmModal();
+      messagesEl.innerHTML = "";
+      emptyStateEl.style.display = "none";
+      membersList.innerHTML = "";
+      memberCountLabel.textContent = "0";
+      resetAttachment();
+      setAvatarElement(userAvatar, userAvatarInitials, null, null, null);
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+        unsubscribeMessages = null;
+      }
+      if (unsubscribeMembers) {
+        unsubscribeMembers();
+        unsubscribeMembers = null;
+      }
+    }
+
+    function smoothScrollMessagesToBottom() {
+      messagesEl.scrollTo({
+        top: messagesEl.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+
+    function openAdminModal() {
+      if (!currentUser || !currentProfile.isAdmin) return;
+      adminModalError.textContent = "";
+      renderAdminPanel();
+      adminModalBackdrop.classList.add("visible");
+    }
+
+    function closeAdminModal() {
+      adminModalBackdrop.classList.remove("visible");
+    }
+
+    function openConfirmModal(message, payload) {
+      pendingDeleteRequest = payload;
+      confirmModalError.textContent = "";
+      confirmModalMessage.textContent = message;
+      confirmModalBackdrop.classList.add("visible");
+    }
+
+    function closeConfirmModal() {
+      pendingDeleteRequest = null;
+      confirmModalError.textContent = "";
+      confirmModalBackdrop.classList.remove("visible");
+    }
+
+    function renderAdminPanel() {
+      adminPanelList.innerHTML = "";
+
+      const users = Object.entries(userCache)
+        .map(([uid, data]) => ({ uid, ...data }))
+        .sort((a, b) => (a.displayName || a.email || "").localeCompare(b.displayName || b.email || ""));
+
+      users.forEach((user) => {
+        const isSelf = currentUser && user.uid === currentUser.uid;
+        const isAdmin = isAdminEmail(user.email);
+
+        const card = document.createElement("div");
+        card.className = "admin-user-card";
+
+        const head = document.createElement("div");
+        head.className = "admin-user-head";
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+        if (user.photoData) {
+          const img = document.createElement("img");
+          img.src = user.photoData;
+          img.alt = user.displayName || user.email || "avatar";
+          img.className = "member-avatar-img";
+          avatar.appendChild(img);
+        } else {
+          const span = document.createElement("span");
+          span.textContent = initialsFromName(user.displayName, user.email);
+          avatar.appendChild(span);
+        }
+
+        const meta = document.createElement("div");
+        meta.className = "admin-user-meta";
+
+        const name = document.createElement("div");
+        name.className = "admin-user-name";
+        name.textContent = user.displayName || user.email || "User";
+        if (isAdmin) name.appendChild(createAdminBadge(true));
+        if (isSelf) {
+          const you = document.createElement("span");
+          you.className = "pill";
+          you.textContent = "You";
+          name.appendChild(you);
+        }
+
+        const email = document.createElement("div");
+        email.className = "admin-user-email";
+        email.textContent = user.email || "";
+
+        const status = document.createElement("div");
+        status.className = "admin-user-status";
+        status.textContent = formatTimeoutStatus(user.timeoutUntil);
+
+        meta.appendChild(name);
+        meta.appendChild(email);
+        meta.appendChild(status);
+        head.appendChild(avatar);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        if (!isAdmin && !isSelf) {
+          const grid = document.createElement("div");
+          grid.className = "admin-timeout-grid";
+
+          TIMEOUT_OPTIONS.forEach((option) => {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-ghost";
+            btn.type = "button";
+            btn.textContent = option.label;
+            btn.addEventListener("click", () => setUserTimeout(user.uid, option.ms));
+            grid.appendChild(btn);
+          });
+
+          const clearBtn = document.createElement("button");
+          clearBtn.className = "btn btn-primary";
+          clearBtn.type = "button";
+          clearBtn.textContent = "Clear";
+          clearBtn.addEventListener("click", () => clearUserTimeout(user.uid));
+          grid.appendChild(clearBtn);
+
+          card.appendChild(grid);
+        }
+
+        adminPanelList.appendChild(card);
+      });
+    }
+
+    async function setUserTimeout(uid, durationMs) {
+      if (!currentUser || !currentProfile.isAdmin) return;
+      adminModalError.textContent = "";
+      try {
+        await db.collection("users").doc(uid).set({
+          timeoutUntil: Date.now() + durationMs,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.error("Error setting timeout:", e);
+        adminModalError.textContent = "Failed to set timeout.";
+      }
+    }
+
+    async function clearUserTimeout(uid) {
+      if (!currentUser || !currentProfile.isAdmin) return;
+      adminModalError.textContent = "";
+      try {
+        await db.collection("users").doc(uid).set({
+          timeoutUntil: null,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.error("Error clearing timeout:", e);
+        adminModalError.textContent = "Failed to clear timeout.";
+      }
+    }
+
+    function renderMessages(snapshot) {
+      lastMessageSnapshot = snapshot;
+      messagesEl.innerHTML = "";
+      const docs = snapshot.docs;
+
+      if (docs.length === 0) {
+        emptyStateEl.style.display = "block";
+        return;
+      }
+      emptyStateEl.style.display = "none";
+
+      docs.forEach((doc) => {
+        const data = doc.data();
+        const uid = data.uid;
+        const text = data.text || "";
+        const imageData = data.imageUrl || data.imageData || null;
+        const imageName = data.imageName || "attachment";
+
+        const profile = userCache[uid] || {};
+        const displayName = profile.displayName || "Unknown";
+        const photoData = profile.photoData || null;
+        const email = profile.email || null;
+
+        const isSelf = currentUser && uid === currentUser.uid;
+
+        const row = document.createElement("div");
+        row.className = "message-row" + (isSelf ? " self" : "");
+
+        if (!isSelf) {
+          const avatar = document.createElement("div");
+          avatar.className = "message-avatar";
+
+          if (photoData) {
+            const img = document.createElement("img");
+            img.src = photoData;
+            img.alt = displayName || email || "avatar";
+            img.className = "message-avatar-img";
+            avatar.appendChild(img);
+          } else {
+            const span = document.createElement("span");
+            span.textContent = initialsFromName(displayName, email);
+            avatar.appendChild(span);
+          }
+
+          row.appendChild(avatar);
+        }
+
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble";
+
+        const header = document.createElement("div");
+        header.className = "message-bubble-header";
+
+        const meta = document.createElement("div");
+        meta.className = "message-meta";
+
+        const author = document.createElement("span");
+        author.className = "message-author";
+
+        const authorNameSpan = document.createElement("span");
+        authorNameSpan.textContent = isSelf ? "You" : displayName;
+        author.appendChild(authorNameSpan);
+
+        const isAdminEmailFlag = isAdminEmail(email);
+        const isSuper = isSuperAdminEmail(email);
+
+        if (isAdminEmailFlag) {
+          author.appendChild(createAdminBadge(isSuper));
+        }
+
+        const time = document.createElement("span");
+        time.className = "message-time";
+        time.textContent = formatTime(data.createdAt);
+
+        meta.appendChild(author);
+        meta.appendChild(time);
+        header.appendChild(meta);
+
+        const canDelete = currentUser && (currentProfile.isAdmin || isSelf);
+        if (canDelete) {
+          const delBtn = document.createElement("button");
+          delBtn.className = "message-delete-btn";
+          delBtn.type = "button";
+          delBtn.innerHTML = "✕";
+          delBtn.title = isSelf ? "Delete your message" : "Delete message";
+          delBtn.addEventListener("click", (e) => deleteMessage(doc.id, uid, e.shiftKey));
+          header.appendChild(delBtn);
+        }
+
+        const textEl = document.createElement("div");
+        textEl.className = "message-text";
+        textEl.textContent = text;
+
+        if (text) {
+          bubble.appendChild(textEl);
+        }
+
+        if (imageData) {
+          const imageWrap = document.createElement("div");
+          imageWrap.className = "message-image-wrap";
+
+          const imageLink = document.createElement("a");
+          imageLink.className = "message-image-link";
+          imageLink.href = imageData;
+          imageLink.target = "_blank";
+          imageLink.rel = "noopener noreferrer";
+
+          const image = document.createElement("img");
+          image.className = "message-image";
+          image.src = imageData;
+          image.alt = imageName;
+
+          imageLink.appendChild(image);
+          imageWrap.appendChild(imageLink);
+
+          const fileLabel = document.createElement("div");
+          fileLabel.className = "message-file-label";
+          fileLabel.textContent = imageName;
+          imageWrap.appendChild(fileLabel);
+
+          bubble.appendChild(imageWrap);
+        }
+
+        bubble.appendChild(header);
+        if (bubble.firstChild !== header) {
+          bubble.insertBefore(header, bubble.firstChild);
+        }
+        row.appendChild(bubble);
+
+        messagesEl.appendChild(row);
+      });
+
+      smoothScrollMessagesToBottom();
+    }
+
+    function subscribeToMessages() {
+      if (unsubscribeMessages) unsubscribeMessages();
+      unsubscribeMessages = db
+        .collection("messages")
+        .orderBy("createdAt", "asc")
+        .limit(200)
+        .onSnapshot(renderMessages, (err) => {
+          console.error("Error listening to messages:", err);
+        });
+    }
+
+    function renderMembers(snapshot) {
+      membersList.innerHTML = "";
+      let count = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const uid = doc.id;
+        const displayName = data.displayName || data.email || "User";
+        const email = data.email || null;
+        const photoData = data.photoData || null;
+        const isMe = currentUser && uid === currentUser.uid;
+        const isAdmin = isAdminEmail(email);
+        const isSuper = isSuperAdminEmail(email);
+
+        const row = document.createElement("div");
+        row.className = "member-row" + (isMe ? " me" : "");
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+
+        if (photoData) {
+          const img = document.createElement("img");
+          img.src = photoData;
+          img.alt = displayName || email || "avatar";
+          img.className = "member-avatar-img";
+          avatar.appendChild(img);
+        } else {
+          const span = document.createElement("span");
+          span.textContent = initialsFromName(displayName, email);
+          avatar.appendChild(span);
+        }
+
+        const main = document.createElement("div");
+        main.className = "member-main";
+
+        const nameLine = document.createElement("div");
+        nameLine.className = "member-name-line";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "member-name";
+        nameSpan.textContent = displayName;
+        nameLine.appendChild(nameSpan);
+
+        if (isAdmin) {
+          nameLine.appendChild(createAdminBadge(isSuper));
+        }
+
+        if (isMe) {
+          const meSpan = document.createElement("span");
+          meSpan.className = "pill";
+          meSpan.textContent = "You";
+          nameLine.appendChild(meSpan);
+        }
+
+        const emailSpan = document.createElement("span");
+        emailSpan.className = "member-email";
+        emailSpan.textContent = email || "";
+
+        main.appendChild(nameLine);
+        main.appendChild(emailSpan);
+
+        if (isTimedOut(data.timeoutUntil)) {
+          const timeoutSpan = document.createElement("span");
+          timeoutSpan.className = "member-status";
+          timeoutSpan.textContent = formatTimeoutStatus(data.timeoutUntil);
+          main.appendChild(timeoutSpan);
+        }
+
+        row.appendChild(avatar);
+        row.appendChild(main);
+
+        membersList.appendChild(row);
+        count++;
+      });
+
+      memberCountLabel.textContent = String(count);
+
+      if (currentUser && userCache[currentUser.uid]) {
+        currentProfile.timeoutUntil = userCache[currentUser.uid].timeoutUntil || null;
+        currentProfile.isAdmin = !!userCache[currentUser.uid].isAdmin || isAdminEmail(userCache[currentUser.uid].email || currentUser.email);
+        applyChatAccessState();
+      }
+
+      if (adminModalBackdrop.classList.contains("visible")) {
+        renderAdminPanel();
+      }
+    }
+
+    function subscribeToMembers() {
+      if (unsubscribeMembers) unsubscribeMembers();
+      unsubscribeMembers = db
+        .collection("users")
+        .orderBy("displayName", "asc")
+        .onSnapshot(snapshot => {
+          userCache = {};
+          snapshot.forEach(doc => {
+            userCache[doc.id] = doc.data();
+          });
+          renderMembers(snapshot);
+          if (lastMessageSnapshot) {
+            renderMessages(lastMessageSnapshot);
+          }
+        }, (err) => {
+          console.error("Error listening to members:", err);
+        });
+    }
+
+    async function handleImageSelection() {
+      const file = imageInput.files && imageInput.files[0];
+      if (!file) {
+        resetAttachment();
+        return;
+      }
+
+      if (!MESSAGE_IMAGE_TYPES.includes(file.type)) {
+        statusBanner.textContent = "Unsupported image type. Use PNG, JPEG, or GIF.";
+        resetAttachment();
+        return;
+      }
+
+      if (file.size > MAX_MESSAGE_IMAGE_BYTES) {
+        statusBanner.textContent = "Image too large. Max size is 12MB.";
+        resetAttachment();
+        return;
+      }
+
+      try {
+        if (attachmentPreviewUrl && attachmentPreviewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(attachmentPreviewUrl);
+        }
+        attachmentPreviewUrl = URL.createObjectURL(file);
+        const dataUrl = await compressImageToDataUrl(file);
+        pendingAttachment = {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          dataUrl
+        };
+        showAttachmentPreview(file, attachmentPreviewUrl);
+        statusBanner.textContent = "Image attached and compressed for base64 sending.";
+      } catch (e) {
+        console.error("Error reading image:", e);
+        statusBanner.textContent = e.message || "Couldn't read that image. Try another file.";
+        resetAttachment();
+      }
+    }
+
+    function triggerSendAnimation() {
+      const btn = sendBtn;
+      const rect = btn.getBoundingClientRect();
+
+      // Clone the button and fly it upward
+      const clone = document.createElement("div");
+      clone.className = "send-clone";
+      clone.textContent = "SEND";
+      clone.style.left = rect.left + "px";
+      clone.style.top = rect.top + "px";
+      clone.style.width = rect.width + "px";
+      clone.style.height = rect.height + "px";
+      document.body.appendChild(clone);
+
+      clone.addEventListener("animationend", () => clone.remove());
+
+      // Spring pop on the real button
+      btn.classList.remove("send-btn-popping");
+      void btn.offsetWidth; // reflow to restart animation
+      btn.classList.add("send-btn-popping");
+      btn.addEventListener("animationend", () => btn.classList.remove("send-btn-popping"), { once: true });
+    }
+
+    async function sendMessage() {
+      const text = messageInput.value.trim();
+      const attachment = pendingAttachment;
+      if ((!text && !attachment) || !currentUser) return;
+      if (isTimedOut(currentProfile.timeoutUntil)) {
+        statusBanner.textContent = `You are timed out. ${formatTimeoutStatus(currentProfile.timeoutUntil)}.`;
+        return;
+      }
+
+      // Trigger animation before clearing
+      triggerSendAnimation();
+
+      messageInput.value = "";
+      messageInput.style.height = "auto";
+      resetAttachment();
+
+      try {
+        await db.collection("messages").add({
+          text,
+          imageData: attachment ? attachment.dataUrl : null,
+          imageName: attachment ? attachment.name : null,
+          imageType: attachment ? attachment.type : null,
+          uid: currentUser.uid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        statusBanner.textContent = "Transmission sent.";
+      } catch (e) {
+        console.error("Error sending message:", e);
+        messageInput.value = text;
+        if (attachment) {
+          pendingAttachment = attachment;
+          if (!attachmentPreviewUrl) {
+            attachmentPreviewUrl = attachment.dataUrl;
+          }
+          showAttachmentPreview(attachment, attachmentPreviewUrl);
+        }
+        statusBanner.textContent = "Failed to send message. Check console.";
+      }
+    }
+
+    async function performDeleteMessage(messageId) {
+      await db.collection("messages").doc(messageId).delete();
+    }
+
+    async function deleteMessage(messageId, ownerUid, skipConfirm = false) {
+      const canDelete = currentUser && (currentProfile.isAdmin || currentUser.uid === ownerUid);
+      if (!canDelete) return;
+
+      const confirmText = currentProfile.isAdmin && currentUser.uid !== ownerUid
+        ? "Delete this message for everyone?"
+        : "Delete your message?";
+
+      if (!skipConfirm) {
+        openConfirmModal(confirmText, { messageId, ownerUid });
+        return;
+      }
+
+      try {
+        await performDeleteMessage(messageId);
+      } catch (e) {
+        console.error("Error deleting message:", e);
+      }
+    }
+
+    function openAuthModal(mode = "signin") {
+      authMode = mode;
+      authError.textContent = "";
+      nameInput.value = "";
+      emailInput.value = "";
+      passwordInput.value = "";
+      confirmInput.value = "";
+
+      if (mode === "signin") {
+        tabSignIn.classList.add("active");
+        tabSignUp.classList.remove("active");
+        nameField.style.display = "none";
+        confirmField.style.display = "none";
+        authSubmitBtn.textContent = "Sign in";
+        authHint.textContent = "Sign in with your email and password.";
+      } else {
+        tabSignIn.classList.remove("active");
+        tabSignUp.classList.add("active");
+        nameField.style.display = "flex";
+        confirmField.style.display = "flex";
+        authSubmitBtn.textContent = "Create account";
+        authHint.textContent = "Choose a display name and a password with at least 6 characters.";
+      }
+
+      authModalBackdrop.classList.add("visible");
+      emailInput.focus();
+    }
+
+    function closeAuthModal() {
+      authModalBackdrop.classList.remove("visible");
+    }
+
+    function mapAuthError(error) {
+      if (!error || !error.code) return "Something went wrong. Please try again.";
+      switch (error.code) {
+        case "auth/invalid-email":
+          return "That email address looks invalid.";
+        case "auth/user-disabled":
+          return "This account has been disabled.";
+        case "auth/user-not-found":
+          return "No account found with that email.";
+        case "auth/wrong-password":
+          return "Incorrect password.";
+        case "auth/email-already-in-use":
+          return "That email is already in use.";
+        case "auth/weak-password":
+          return "Password should be at least 6 characters.";
+        default:
+          return error.message || "Authentication failed.";
+      }
+    }
+
+    async function handleAuthSubmit() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const name = nameInput.value.trim();
+      const confirm = confirmInput.value;
+
+      authError.textContent = "";
+
+      if (!email || !password) {
+        authError.textContent = "Email and password are required.";
+        return;
+      }
+
+      if (authMode === "signup") {
+        if (!name) {
+          authError.textContent = "Please enter a display name.";
+          return;
+        }
+        if (password !== confirm) {
+          authError.textContent = "Passwords do not match.";
+          return;
+        }
+      }
+
+      authSubmitBtn.disabled = true;
+      authSubmitBtn.textContent = authMode === "signin" ? "Signing in…" : "Creating account…";
+
+      try {
+        if (authMode === "signin") {
+          await auth.signInWithEmailAndPassword(email, password);
+          closeAuthModal();
+        } else {
+          const cred = await auth.createUserWithEmailAndPassword(email, password);
+          if (cred.user) {
+            await cred.user.updateProfile({ displayName: name });
+            await db.collection("users").doc(cred.user.uid).set({
+              displayName: name,
+              email: cred.user.email || email,
+              photoData: null,
+              isAdmin: isAdminEmail(cred.user.email || email),
+              timeoutUntil: null,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          }
+          closeAuthModal();
+        }
+      } catch (e) {
+        console.error(e);
+        authError.textContent = mapAuthError(e);
+      } finally {
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.textContent = authMode === "signin" ? "Sign in" : "Create account";
+      }
+    }
+
+    function openProfileModal() {
+      if (!currentUser) {
+        statusBanner.textContent = "You must be signed in to edit your profile.";
+        return;
+      }
+      profileError.textContent = "";
+      profileNameInput.value =
+        currentProfile.displayName ||
+        currentUser.displayName ||
+        currentUser.email ||
+        "";
+      profileBase64Input.value = currentProfile.photoData || "";
+      profileBase64Field.style.display = currentProfile.photoData ? "flex" : "none";
+      profileFileInput.value = "";
+      updateProfilePreview();
+      profileModalBackdrop.classList.add("visible");
+    }
+
+    function closeProfileModal() {
+      profileModalBackdrop.classList.remove("visible");
+    }
+
+    function updateProfilePreview() {
+      while (profilePreviewAvatar.firstChild) {
+        profilePreviewAvatar.removeChild(profilePreviewAvatar.firstChild);
+      }
+      const name = profileNameInput.value.trim() ||
+        currentProfile.displayName ||
+        currentUser?.displayName ||
+        currentUser?.email ||
+        "";
+      const photoData = profileBase64Input.value.trim() || currentProfile.photoData || null;
+
+      if (photoData) {
+        const img = document.createElement("img");
+        img.src = photoData;
+        img.alt = name || "avatar";
+        img.className = "profile-preview-img";
+        profilePreviewAvatar.appendChild(img);
+      } else {
+        const span = document.createElement("span");
+        span.textContent = initialsFromName(name, currentUser?.email || "");
+        profilePreviewAvatar.appendChild(span);
+      }
+
+      profilePreviewText.textContent = name
+        ? `Visible as "${name}" in chat.`
+        : "This is how your avatar will appear in chat.";
+    }
+
+    function handleProfileFileChange() {
+      const file = profileFileInput.files && profileFileInput.files[0];
+      if (!file) return;
+
+      const MAX_BYTES = 10 * 1024 * 1024;
+      if (file.size > MAX_BYTES) {
+        profileError.textContent = "Image too large. Max size is 10MB.";
+        profileFileInput.value = "";
+        return;
+      }
+
+      const allowedTypes = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp"
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        profileError.textContent = "Unsupported file type. Use PNG, JPG, GIF, or WEBP.";
+        profileFileInput.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target.result;
+        if (typeof result === "string") {
+          profileBase64Input.value = result;
+          profileBase64Field.style.display = "flex";
+          profileError.textContent = "";
+          updateProfilePreview();
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleProfileClearImage() {
+      profileBase64Input.value = "";
+      profileBase64Field.style.display = "none";
+      profileError.textContent = "";
+      updateProfilePreview();
+    }
+
+    function handleProfileToggleBase64Field() {
+      if (profileBase64Field.style.display === "none" || profileBase64Field.style.display === "") {
+        profileBase64Field.style.display = "flex";
+      } else {
+        profileBase64Field.style.display = "none";
+      }
+    }
+
+    profileBase64Input.addEventListener("input", () => {
+      const value = profileBase64Input.value.trim();
+
+      if (value.length > 0) {
+        const validHeader =
+          value.startsWith("data:image/png;base64,") ||
+          value.startsWith("data:image/jpeg;base64,") ||
+          value.startsWith("data:image/jpg;base64,") ||
+          value.startsWith("data:image/gif;base64,") ||
+          value.startsWith("data:image/webp;base64,");
+
+        if (!validHeader) {
+          profileError.textContent =
+            "Invalid base64 image. Must be PNG, JPG, GIF, or WEBP.";
+          return;
+        }
+
+        const commaIndex = value.indexOf(",");
+        if (commaIndex !== -1) {
+          const base64Part = value.slice(commaIndex + 1);
+          const approxBytes = Math.ceil(base64Part.length * 0.75);
+          if (approxBytes > 10 * 1024 * 1024) {
+            profileError.textContent = "Base64 image exceeds 10MB limit.";
+            return;
+          }
+        }
+      }
+
+      profileError.textContent = "";
+      updateProfilePreview();
+    });
+
+    async function handleProfileSave() {
+      if (!currentUser) {
+        profileError.textContent = "You must be signed in.";
+        return;
+      }
+      const name = profileNameInput.value.trim();
+      const photoData = profileBase64Input.value.trim() || null;
+
+      if (!name) {
+        profileError.textContent = "Display name is required.";
+        return;
+      }
+
+      profileError.textContent = "";
+      profileSaveBtn.disabled = true;
+      profileSaveBtn.textContent = "Saving…";
+
+      try {
+        await currentUser.updateProfile({
+          displayName: name
+        });
+
+        const email = currentUser.email || null;
+        await db.collection("users").doc(currentUser.uid).set({
+          displayName: name,
+          email,
+          photoData: photoData || null,
+          isAdmin: isAdminEmail(email),
+          timeoutUntil: currentProfile.timeoutUntil || null,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        currentProfile.displayName = name;
+        currentProfile.photoData = photoData;
+        currentProfile.isAdmin = isAdminEmail(email);
+
+        setSignedInUI(currentUser);
+        closeProfileModal();
+      } catch (e) {
+        console.error(e);
+        profileError.textContent = "Failed to save profile. Check console.";
+      } finally {
+        profileSaveBtn.disabled = false;
+        profileSaveBtn.textContent = "Save profile";
+      }
+    }
+
+    async function loadUserProfile(user) {
+      currentProfile = { displayName: null, photoData: null, isAdmin: false, timeoutUntil: null };
+      try {
+        const doc = await db.collection("users").doc(user.uid).get();
+        if (doc.exists) {
+          const data = doc.data();
+          currentProfile.displayName = data.displayName || user.displayName || null;
+          currentProfile.photoData = data.photoData || null;
+          currentProfile.timeoutUntil = data.timeoutUntil || null;
+          currentProfile.isAdmin =
+            !!data.isAdmin || isAdminEmail(data.email || user.email);
+        } else {
+          currentProfile.displayName = user.displayName || null;
+          currentProfile.photoData = null;
+          currentProfile.timeoutUntil = null;
+          currentProfile.isAdmin = isAdminEmail(user.email);
+          await db.collection("users").doc(user.uid).set({
+            displayName: currentProfile.displayName || user.email || "User",
+            email: user.email || null,
+            photoData: null,
+            isAdmin: currentProfile.isAdmin,
+            timeoutUntil: null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error("Error loading profile:", e);
+        currentProfile.displayName = user.displayName || null;
+        currentProfile.photoData = null;
+        currentProfile.timeoutUntil = null;
+        currentProfile.isAdmin = isAdminEmail(user.email);
+      }
+    }
+
+    authBtn.addEventListener("click", async () => {
+      if (currentUser) {
+        try {
+          await auth.signOut();
+        } catch (e) {
+          console.error(e);
+        }
+        return;
+      }
+      openAuthModal("signin");
+    });
+
+    profileTrigger.addEventListener("click", (e) => {
+      if (e.target === authBtn) return;
+      if (!currentUser) {
+        statusBanner.textContent = "Sign in first, then edit your profile.";
+        return;
+      }
+      openProfileModal();
+    });
+
+    tabSignIn.addEventListener("click", () => openAuthModal("signin"));
+    tabSignUp.addEventListener("click", () => openAuthModal("signup"));
+
+    authModalClose.addEventListener("click", closeAuthModal);
+    authCancelBtn.addEventListener("click", closeAuthModal);
+
+    authModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === authModalBackdrop) {
+        closeAuthModal();
+      }
+    });
+
+    authSubmitBtn.addEventListener("click", handleAuthSubmit);
+
+    [emailInput, passwordInput, confirmInput, nameInput].forEach(input => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleAuthSubmit();
+        }
+      });
+    });
+
+    profileModalClose.addEventListener("click", closeProfileModal);
+    profileCancelBtn.addEventListener("click", closeProfileModal);
+
+    profileModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === profileModalBackdrop) {
+        closeProfileModal();
+      }
+    });
+
+    profileFileInput.addEventListener("change", handleProfileFileChange);
+    profileClearImageBtn.addEventListener("click", handleProfileClearImage);
+    profilePasteBase64Btn.addEventListener("click", handleProfileToggleBase64Field);
+    profileNameInput.addEventListener("input", updateProfilePreview);
+    profileSaveBtn.addEventListener("click", handleProfileSave);
+    adminPanelBtn.addEventListener("click", openAdminModal);
+    adminModalClose.addEventListener("click", closeAdminModal);
+    adminModalCancelBtn.addEventListener("click", closeAdminModal);
+    adminModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === adminModalBackdrop) {
+        closeAdminModal();
+      }
+    });
+    confirmModalClose.addEventListener("click", closeConfirmModal);
+    confirmModalCancelBtn.addEventListener("click", closeConfirmModal);
+    confirmModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === confirmModalBackdrop) {
+        closeConfirmModal();
+      }
+    });
+    confirmModalConfirmBtn.addEventListener("click", async () => {
+      if (!pendingDeleteRequest) return;
+      confirmModalError.textContent = "";
+      confirmModalConfirmBtn.disabled = true;
+      try {
+        await performDeleteMessage(pendingDeleteRequest.messageId);
+        closeConfirmModal();
+      } catch (e) {
+        console.error("Error deleting message:", e);
+        confirmModalError.textContent = "Failed to delete message.";
+      } finally {
+        confirmModalConfirmBtn.disabled = false;
+      }
+    });
+
+    attachBtn.addEventListener("click", () => imageInput.click());
+    imageInput.addEventListener("change", handleImageSelection);
+    clearAttachBtn.addEventListener("click", resetAttachment);
+    sendBtn.addEventListener("click", sendMessage);
+
+    // Changelog modal — version-aware auto-show
+    // ─────────────────────────────────────────
+    // IMPORTANT: bump CHANGELOG_VERSION whenever you add a new entry.
+    // The modal will automatically reappear for all users on their next visit.
+    const CHANGELOG_VERSION = "1.3";
+    const CHANGELOG_SEEN_KEY = "orbit_changelog_seen";
+
+    function changelogAlreadySeen() {
+      try { return localStorage.getItem(CHANGELOG_SEEN_KEY) === CHANGELOG_VERSION; }
+      catch (e) { return false; }
+    }
+
+    function markChangelogSeen() {
+      try { localStorage.setItem(CHANGELOG_SEEN_KEY, CHANGELOG_VERSION); }
+      catch (e) {}
+    }
+
+    function setChangelogBadge(hasUpdate) {
+      const btn = document.getElementById("changelogBtn");
+      if (hasUpdate) btn.classList.add("has-update");
+      else btn.classList.remove("has-update");
+    }
+
+    function openChangelog() {
+      changelogModalBackdrop.style.display = "flex";
+      requestAnimationFrame(() => changelogModalBackdrop.classList.add("visible"));
+      markChangelogSeen();
+      setChangelogBadge(false);
+
+      // 5-second countdown before "Got it" is enabled
+      const closeBtn = document.getElementById("changelogModalCloseBtn");
+      const countdownSpan = document.getElementById("changelogCountdown");
+      let seconds = 5;
+      closeBtn.disabled = true;
+      countdownSpan.textContent = `(${seconds})`;
+
+      const interval = setInterval(() => {
+        seconds--;
+        if (seconds > 0) {
+          countdownSpan.textContent = `(${seconds})`;
+        } else {
+          clearInterval(interval);
+          countdownSpan.textContent = "";
+          closeBtn.disabled = false;
+        }
+      }, 1000);
+    }
+    function closeChangelog() {
+      changelogModalBackdrop.classList.remove("visible");
+      setTimeout(() => { changelogModalBackdrop.style.display = ""; }, 180);
+    }
+
+    // Wire up button and modal controls
+    document.getElementById("changelogBtn").addEventListener("click", openChangelog);
+    document.getElementById("changelogModalClose").addEventListener("click", closeChangelog);
+    document.getElementById("changelogModalCloseBtn").addEventListener("click", closeChangelog);
+    document.getElementById("changelogModalBackdrop").addEventListener("click", (e) => {
+      if (e.target === changelogModalBackdrop) closeChangelog();
+    });
+
+    // Auto-show on first visit for this version
+    if (!changelogAlreadySeen()) {
+      // Small delay so the page finishes rendering first
+      setTimeout(openChangelog, 600);
+    } else {
+      // Already seen — no badge, no auto-open
+      setChangelogBadge(false);
+    }
+
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    messageInput.addEventListener("input", () => {
+      messageInput.style.height = "auto";
+      messageInput.style.height = messageInput.scrollHeight + "px";
+
+      const typingIndicator = document.getElementById("typingIndicator");
+      const typingLabel = document.getElementById("typingLabel");
+      const hasText = messageInput.value.trim().length > 0;
+      if (hasText && currentUser) {
+        const name = currentProfile.displayName || currentUser.email || "You";
+        typingLabel.textContent = `${name} is typing…`;
+        typingIndicator.classList.remove("hidden");
+        clearTimeout(messageInput._typingTimeout);
+        messageInput._typingTimeout = setTimeout(() => {
+          typingIndicator.classList.add("hidden");
+        }, 2000);
+      } else {
+        typingIndicator.classList.add("hidden");
+      }
+    });
+
+    themeSelect.addEventListener("change", () => {
+      const value = themeSelect.value;
+      applyTheme(value);
+    });
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        await loadUserProfile(user);
+        setSignedInUI(user);
+        subscribeToMessages();
+        subscribeToMembers();
+      } else {
+        setSignedOutUI();
+      }
+    });
+
+    initTheme();
+    setSignedOutUI();
+  </script>
+
+  <script>
+    // Galaxy Canvas - Milky Way band + shooting stars + twinkling
+    (function() {
+      const canvas = document.getElementById('galaxy-canvas');
+      const ctx = canvas.getContext('2d');
+
+      let W, H, stars = [], shootingStars = [], nebulae = [];
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        init();
+      }
+
+      function randRange(a, b) { return a + Math.random() * (b - a); }
+
+      function init() {
+        stars = [];
+        nebulae = [];
+
+        // Background tiny stars — only visible on dark themes
+        for (let i = 0; i < 320; i++) {
+          stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            r: randRange(0.3, 1.2),
+            baseAlpha: randRange(0.2, 0.9),
+            alpha: 0,
+            twinkleSpeed: randRange(0.004, 0.018),
+            twinklePhase: Math.random() * Math.PI * 2,
+            color: Math.random() < 0.15
+              ? `hsl(${randRange(200,260)},80%,90%)`   // blue-white
+              : Math.random() < 0.1
+                ? `hsl(${randRange(20,40)},80%,85%)`   // warm yellow
+                : '#ffffff'
+          });
+        }
+
+        // Milky Way nebula patches
+        for (let i = 0; i < 8; i++) {
+          nebulae.push({
+            x: randRange(0.1, 0.9) * W,
+            y: randRange(0.2, 0.85) * H,
+            rx: randRange(W * 0.08, W * 0.22),
+            ry: randRange(H * 0.04, H * 0.12),
+            angle: randRange(-0.4, 0.4),
+            colors: [
+              `rgba(${[70,100,200][i%3]},${[90,120,80][i%3]},${[255,200,255][i%3]},0.028)`,
+              'transparent'
+            ]
+          });
+        }
+      }
+
+      let tick = 0;
+      function spawnShootingStar() {
+        if (shootingStars.length < 3 && Math.random() < 0.008) {
+          const side = Math.random() < 0.5;
+          shootingStars.push({
+            x: randRange(0.1, 0.9) * W,
+            y: randRange(0.05, 0.4) * H,
+            len: randRange(80, 200),
+            speed: randRange(8, 18),
+            angle: randRange(0.3, 0.7),
+            alpha: 1,
+            trail: []
+          });
+        }
+      }
+
+      function getThemeColors() {
+        const cl = document.body.classList;
+        if (cl.contains('theme-light'))  return { star: 'rgba(20,10,60,', nebula: [[60,40,160],[80,40,180],[40,20,120]], shooting: '80,60,180' };
+        if (cl.contains('theme-blue'))   return { star: 'rgba(255,255,255,', nebula: [[40,100,255],[60,160,255],[20,80,200]], shooting: '120,180,255' };
+        if (cl.contains('theme-purple')) return { star: 'rgba(255,255,255,', nebula: [[130,50,255],[180,80,255],[80,30,200]], shooting: '180,120,255' };
+        if (cl.contains('theme-red'))    return { star: 'rgba(255,255,255,', nebula: [[220,60,40],[255,120,60],[180,30,20]], shooting: '255,140,100' };
+        return { star: 'rgba(255,255,255,', nebula: [[80,110,255],[168,100,255],[255,130,80]], shooting: '200,220,255' };
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        const tc = getThemeColors();
+
+        tick++;
+        spawnShootingStar();
+
+        // Draw nebula Milky Way band
+        ctx.save();
+        nebulae.forEach((n, i) => {
+          ctx.save();
+          ctx.translate(n.x, n.y);
+          ctx.rotate(n.angle);
+          const nc = tc.nebula[i % tc.nebula.length];
+          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(n.rx, n.ry));
+          grad.addColorStop(0, `rgba(${nc[0]},${nc[1]},${nc[2]},0.035)`);
+          grad.addColorStop(1, 'transparent');
+          ctx.scale(n.rx / Math.max(n.rx, n.ry), n.ry / Math.max(n.rx, n.ry));
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(0, 0, Math.max(n.rx, n.ry), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+        ctx.restore();
+
+        // Draw twinkling stars
+        stars.forEach(s => {
+          s.twinklePhase += s.twinkleSpeed;
+          s.alpha = s.baseAlpha * (0.5 + 0.5 * Math.sin(s.twinklePhase));
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `${tc.star}${s.alpha})`;
+          if (s.r > 0.9 && s.alpha > 0.6) {
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = `${tc.star}0.8)`;
+          } else {
+            ctx.shadowBlur = 0;
+          }
+          ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+
+        // Draw shooting stars
+        shootingStars = shootingStars.filter(ss => ss.alpha > 0.02);
+        shootingStars.forEach(ss => {
+          const dx = Math.cos(ss.angle) * ss.speed;
+          const dy = Math.sin(ss.angle) * ss.speed;
+          ss.x += dx;
+          ss.y += dy;
+          ss.alpha *= 0.96;
+
+          const tailX = ss.x - Math.cos(ss.angle) * ss.len;
+          const tailY = ss.y - Math.sin(ss.angle) * ss.len;
+          const grad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y);
+          grad.addColorStop(0, `rgba(255,255,255,0)`);
+          grad.addColorStop(0.7, `rgba(200,220,255,${ss.alpha * 0.4})`);
+          grad.addColorStop(1, `rgba(255,255,255,${ss.alpha})`);
+
+          ctx.beginPath();
+          ctx.moveTo(tailX, tailY);
+          ctx.lineTo(ss.x, ss.y);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // Tip glow
+          ctx.beginPath();
+          ctx.arc(ss.x, ss.y, 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = `${tc.star}${ss.alpha})`;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = `rgba(${tc.shooting},0.8)`;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        });
+
+        requestAnimationFrame(draw);
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+      draw();
+    })();
+  </script>
+</body>
+</html>
