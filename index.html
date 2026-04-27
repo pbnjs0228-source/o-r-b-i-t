@@ -4713,7 +4713,6 @@
       void btn.offsetWidth; // reflow to restart animation
       btn.classList.add("send-btn-popping");
       btn.addEventListener("animationend", () => btn.classList.remove("send-btn-popping"), { once: true });
-    }
 
     async function sendMessage() {
       const text = messageInput.value.trim();
