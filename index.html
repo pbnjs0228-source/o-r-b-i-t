@@ -1529,13 +1529,35 @@
         max-height: 48px;
       }
 
-      /* Voice card: normal vertical layout on mobile, compact */
+      /* Voice card: collapsible on mobile */
       .voice-card {
         border: none;
         border-bottom: 1px solid var(--border-subtle);
         padding: 6px 10px;
         flex-direction: column;
         max-height: none;
+      }
+
+      /* On mobile, collapse voice live panel tightly */
+      .voice-card .voice-live-panel.open {
+        max-height: 220px;
+        overflow-y: auto;
+      }
+
+      /* Mic meter: compact on mobile */
+      .mic-meter-wrap {
+        padding: 4px 0;
+        gap: 4px;
+      }
+
+      /* Voice controls: full width on mobile */
+      .voice-controls {
+        gap: 4px;
+      }
+
+      .voice-ctrl-btn {
+        padding: 5px 8px;
+        font-size: 11px;
       }
 
       .voice-card .sidebar-body {
@@ -4693,6 +4715,8 @@
     messageInput.addEventListener("keydown", e => {
       if (e.key === "Escape" && replyTarget) { cancelReply(); }
     });
+
+    function triggerSendAnimation() {
       const btn = sendBtn;
       const rect = btn.getBoundingClientRect();
 
@@ -4713,6 +4737,7 @@
       void btn.offsetWidth; // reflow to restart animation
       btn.classList.add("send-btn-popping");
       btn.addEventListener("animationend", () => btn.classList.remove("send-btn-popping"), { once: true });
+    }
 
     async function sendMessage() {
       const text = messageInput.value.trim();
@@ -5573,26 +5598,41 @@
 
     // ── Shared AudioContext ───────────────────────────────────────────────────
     let _sharedAudioCtx = null;
+    let _audioUnlocked = false;
+
     function getAudioCtx() {
       if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
-        _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
       }
       if (_sharedAudioCtx.state === 'suspended') _sharedAudioCtx.resume().catch(() => {});
       return _sharedAudioCtx;
     }
 
+    // iOS requires playing a silent audio buffer inside a user gesture
+    // to unlock the audio session before any async work can produce sound.
+    function unlockAudioSession() {
+      if (_audioUnlocked) return;
+      try {
+        const ctx = getAudioCtx();
+        const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        ctx.resume().then(() => { _audioUnlocked = true; }).catch(() => {});
+      } catch(e) {}
+    }
+
     function makeAnalyser(stream) {
       try {
-        const ctx     = getAudioCtx();
-        const src     = ctx.createMediaStreamSource(stream);
-        const an      = ctx.createAnalyser();
-        an.fftSize    = 1024;
+        const ctx  = getAudioCtx();
+        const src  = ctx.createMediaStreamSource(stream);
+        const an   = ctx.createAnalyser();
+        an.fftSize = 1024;
         an.smoothingTimeConstant = 0.4;
-        const silence = ctx.createGain();
-        silence.gain.value = 0;
+        // Do NOT connect to destination — prevents feedback/echo on mobile
+        // and avoids iOS routing the mic through the speaker.
         src.connect(an);
-        an.connect(silence);
-        silence.connect(ctx.destination);
         const arr     = new Uint8Array(an.frequencyBinCount);
         const timeArr = new Uint8Array(an.fftSize);
         return { analyser: an, dataArr: arr, timeArr, ctx, src };
@@ -5787,19 +5827,36 @@
         let audio = document.getElementById(`voice-audio-${remoteUid}`);
         if (!audio) {
           audio = document.createElement('audio');
-          audio.autoplay = true;
+          // All three forms required for cross-browser iOS/Android autoplay
+          audio.autoplay       = true;
+          audio.playsInline    = true;   // property form
+          audio.controls       = false;
+          audio.muted          = false;
+          audio.volume         = 1.0;
+          audio.id             = `voice-audio-${remoteUid}`;
           audio.setAttribute('playsinline', '');
           audio.setAttribute('webkit-playsinline', '');
-          audio.muted = false;
-          audio.volume = 1.0;
-          audio.id = `voice-audio-${remoteUid}`;
+          audio.setAttribute('x-webkit-airplay', 'allow');
           document.body.appendChild(audio);
         }
         audio.srcObject = stream;
-        const tryPlay = () => { getAudioCtx().resume().catch(()=>{}); audio.play().catch(()=>{}); };
+
+        // Robust iOS play strategy: resume AudioContext then play,
+        // retry on interaction if autoplay was blocked.
+        async function tryPlay() {
+          try {
+            await getAudioCtx().resume();
+            await audio.play();
+          } catch(err) {
+            // Autoplay blocked — wait for next user interaction
+            const retry = async () => {
+              try { await getAudioCtx().resume(); await audio.play(); } catch(e) {}
+            };
+            document.addEventListener('click',      retry, { once: true });
+            document.addEventListener('touchstart', retry, { once: true });
+          }
+        }
         tryPlay();
-        document.addEventListener('click',      tryPlay, { once: true });
-        document.addEventListener('touchstart', tryPlay, { once: true });
 
         if (!peers[remoteUid]?.analyser) {
           const an = makeAnalyser(stream);
@@ -5810,7 +5867,21 @@
       pc.onconnectionstatechange = () => {
         const s = pc.connectionState;
         console.log(`[voice] ${remoteUid} → ${s}`);
-        if (s === 'failed' && !polite && inVoice) sendOffer(remoteUid, pc, true);
+        if (s === 'failed' && inVoice) {
+          // Both peers retry on failure — the impolite peer sends iceRestart offer,
+          // the polite peer will respond. This recovers from mobile network switches.
+          if (!polite) sendOffer(remoteUid, pc, true);
+        }
+        if (s === 'disconnected' && inVoice) {
+          // Transient disconnection (e.g. phone screen lock) — give it 6s to recover
+          setTimeout(() => {
+            if (!peers[remoteUid]) return;
+            const st = peers[remoteUid].pc.connectionState;
+            if ((st === 'disconnected' || st === 'failed') && !polite && inVoice) {
+              sendOffer(remoteUid, pc, true);
+            }
+          }, 6000);
+        }
       };
 
       peersLock.delete(remoteUid);
@@ -5979,6 +6050,10 @@
       if (!user) { alert('Sign in to use voice chat.'); return; }
       if (inVoice) return;
 
+      // Unlock iOS audio session NOW — we are inside the button click handler (user gesture).
+      // Must be synchronous before any await, or iOS won't count it as a gesture.
+      unlockAudioSession();
+
       myUid = user.uid;
       sessionId++;
       setStatus('Fetching profile…');
@@ -5986,8 +6061,21 @@
 
       setStatus('Requesting microphone…');
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        getAudioCtx().resume().catch(() => {});
+        // Try rich constraints first (echo cancellation, noise suppression)
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000
+          },
+          video: false
+        }).catch(() =>
+          // Fallback: bare minimum — works on all Android/iOS browsers
+          navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        );
+        // Resume AudioContext — already unlocked by the button click gesture
+        await getAudioCtx().resume().catch(() => {});
       } catch(e) {
         setStatus('Microphone access denied. Check browser permissions.');
         console.error(e); return;
