@@ -4981,57 +4981,54 @@
   <script>
   (function() {
     // ── Config ──────────────────────────────────────────────────────────────
-    const ROOM_ID   = 'general';
-    const ROOM_REF  = () => db.collection('voiceRooms').doc(ROOM_ID);
-    const SIGS_REF  = () => ROOM_REF().collection('signals');
+    const ROOM_ID  = 'general';
+    const ROOM_REF = () => db.collection('voiceRooms').doc(ROOM_ID);
+    // Each user gets their own signal inbox — avoids collection query permission issues
+    // Path: voiceRooms/general/inboxes/{uid}/signals/{signalId}
+    const INBOX_REF = (uid) => ROOM_REF().collection('inboxes').doc(uid).collection('signals');
 
     const ICE_SERVERS = {
       iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun.l.google.com:19302'  },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        // Free TURN via Open Relay (metered.ca free tier)
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
+        { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
       ]
     };
 
     // ── State ────────────────────────────────────────────────────────────────
-    let localStream    = null;
-    let isMuted        = false;
-    let inVoice        = false;
-    let myUid          = null;
+    let localStream   = null;
+    let isMuted       = false;
+    let inVoice       = false;
+    let myUid         = null;
+    let sessionId     = 0;   // incremented each join; stale callbacks abort
 
-    // peers[uid] = { pc: RTCPeerConnection, stream: MediaStream, analyser, dataArr }
-    const peers        = {};
-    let roomUnsub      = null;
-    let sigsUnsub      = null;
-    let kickUnsub      = null;
-    let previewUnsub   = null;
+    const peers       = {};  // uid → { pc, stream, analyser, hasRemote }
+    const pendingIce  = {};  // uid → RTCIceCandidate[]
+    const peersLock   = new Set(); // uids currently being created (async guard)
+    const sigQueues   = {};  // uid → Promise chain for serial signal processing
+
+    let roomUnsub     = null;
+    let sigsUnsub     = null;
+    let kickUnsub     = null;
+    let previewUnsub  = null;
 
     // Speaking detection
-    const speakMap     = {};   // uid -> bool
-    let localAnalyser  = null;
-    let localDataArr   = null;
-    let speakTick      = null;
+    const speakSmooth = {};
+    let localAnalyser = null;
+    let speakTick     = null;
 
     // Mic meter
-    let micRafId       = null;
-    let peakLevel      = 0;
-    let peakHoldTimer  = null;
+    let micRafId      = null;
+    let peakLevel     = 0;
+    let peakHoldTimer = null;
 
-    // Hear yourself loopback
-    let hearYourself   = false;
-    let loopbackAudio  = null;
-    let loopbackCtx    = null;
+    // Hear yourself
+    let hearYourself  = false;
+    let loopbackAudio = null;
+    let loopbackCtx   = null;
 
     // ── DOM refs ─────────────────────────────────────────────────────────────
     const joinBtn      = document.getElementById('voiceJoinBtn');
@@ -5049,7 +5046,6 @@
     const hearBtn      = document.getElementById('hearYourselfBtn');
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    // Cached after Firestore fetch on join — avoids cross-script let scoping issues
     let _cachedName  = null;
     let _cachedPhoto = null;
 
@@ -5064,124 +5060,84 @@
           _cachedName  = doc.data().displayName || _cachedName;
           _cachedPhoto = doc.data().photoData   || null;
         }
-      } catch(e) { console.warn('voice: could not fetch profile', e); }
+      } catch(e) { console.warn('[voice] could not fetch profile', e); }
     }
 
     function initials(name) {
       return (name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     }
-
     function avatarHTML(name, photo) {
       if (photo) return `<img src="${photo}" alt="${name}" />`;
       return initials(name);
     }
+    function setStatus(msg) { statusText.textContent = msg; }
 
-    function setStatus(msg) {
-      statusText.textContent = msg;
-    }
-
-    // Shared AudioContext — browsers suspend a context that has no connected destination
+    // ── Shared AudioContext ───────────────────────────────────────────────────
     let _sharedAudioCtx = null;
     function getAudioCtx() {
       if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
         _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
-      if (_sharedAudioCtx.state === 'suspended') {
-        _sharedAudioCtx.resume().catch(() => {});
-      }
+      if (_sharedAudioCtx.state === 'suspended') _sharedAudioCtx.resume().catch(() => {});
       return _sharedAudioCtx;
     }
 
     function makeAnalyser(stream) {
       try {
-        const ctx  = getAudioCtx();
-        const src  = ctx.createMediaStreamSource(stream);
-        const an   = ctx.createAnalyser();
-        an.fftSize = 1024;
+        const ctx     = getAudioCtx();
+        const src     = ctx.createMediaStreamSource(stream);
+        const an      = ctx.createAnalyser();
+        an.fftSize    = 1024;
         an.smoothingTimeConstant = 0.4;
-
-        // Silent gain node — keeps the graph connected so the context stays running
         const silence = ctx.createGain();
         silence.gain.value = 0;
-
         src.connect(an);
         an.connect(silence);
         silence.connect(ctx.destination);
-
         const arr     = new Uint8Array(an.frequencyBinCount);
         const timeArr = new Uint8Array(an.fftSize);
         return { analyser: an, dataArr: arr, timeArr, ctx, src };
-      } catch(e) { console.warn('makeAnalyser failed:', e); return null; }
+      } catch(e) { console.warn('[voice] makeAnalyser failed:', e); return null; }
     }
-
-    // Smoothed speaking averages per uid to prevent flicker
-    const speakSmooth = {};
 
     function isSpeaking(uid, analyser, dataArr) {
       if (!analyser) return false;
       analyser.getByteFrequencyData(dataArr);
-      // Focus on speech frequencies: bins ~80Hz–3kHz (roughly indices 2–80 at 48kHz/1024)
       let sum = 0;
       const start = 2, end = Math.min(80, dataArr.length);
       for (let i = start; i < end; i++) sum += dataArr[i];
       const avg = sum / (end - start);
-
-      // Exponential moving average per uid for smooth hysteresis
       if (!speakSmooth[uid]) speakSmooth[uid] = 0;
       speakSmooth[uid] = speakSmooth[uid] * 0.75 + avg * 0.25;
-
-      return speakSmooth[uid] > 4; // threshold: 4 = very sensitive, increase if false positives
+      return speakSmooth[uid] > 4;
     }
 
-    // ── Mic level meter (rAF-driven, smooth) ─────────────────────────────────
+    // ── Mic meter ─────────────────────────────────────────────────────────────
     function startMicMeter() {
       if (micRafId) return;
       peakLevel = 0;
-
       function drawMeter() {
         if (!localAnalyser) { micRafId = null; return; }
         const { analyser, timeArr } = localAnalyser;
         analyser.getByteTimeDomainData(timeArr);
-
-        // RMS level from time-domain waveform
         let sumSq = 0;
-        for (let i = 0; i < timeArr.length; i++) {
-          const v = (timeArr[i] - 128) / 128;
-          sumSq += v * v;
-        }
+        for (let i = 0; i < timeArr.length; i++) { const v = (timeArr[i]-128)/128; sumSq += v*v; }
         const rms = Math.sqrt(sumSq / timeArr.length);
-
-        // dB: map 0..1 → −60..0 dB, display as percentage
-        const db  = rms > 0 ? Math.max(-60, 20 * Math.log10(rms)) : -60;
-        const pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
-
-        // Peak hold
+        const db  = rms > 0 ? Math.max(-60, 20*Math.log10(rms)) : -60;
+        const pct = Math.max(0, Math.min(100, (db+60)/60*100));
         if (pct > peakLevel) {
           peakLevel = pct;
           clearTimeout(peakHoldTimer);
-          peakHoldTimer = setTimeout(() => {
-            peakLevel = 0;
-            micMeterPeak.classList.remove('visible');
-          }, 1200);
+          peakHoldTimer = setTimeout(() => { peakLevel=0; micMeterPeak.classList.remove('visible'); }, 1200);
         }
-
-        micMeterFill.style.width = pct.toFixed(1) + '%';
+        micMeterFill.style.width = pct.toFixed(1)+'%';
         micMeterFill.classList.toggle('clipping', pct > 90);
-
-        if (peakLevel > 0) {
-          micMeterPeak.style.left = peakLevel.toFixed(1) + '%';
-          micMeterPeak.classList.add('visible');
-        }
-
-        // Label: show dB value
-        micMeterVal.textContent = db > -59 ? db.toFixed(0) + 'dB' : '—';
-
+        if (peakLevel > 0) { micMeterPeak.style.left = peakLevel.toFixed(1)+'%'; micMeterPeak.classList.add('visible'); }
+        micMeterVal.textContent = db > -59 ? db.toFixed(0)+'dB' : '—';
         micRafId = requestAnimationFrame(drawMeter);
       }
-
       micRafId = requestAnimationFrame(drawMeter);
     }
-
     function stopMicMeter() {
       if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
       clearTimeout(peakHoldTimer);
@@ -5190,21 +5146,18 @@
       micMeterVal.textContent = '—';
     }
 
-    // ── Hear yourself (loopback to own speakers) ──────────────────────────────
+    // ── Hear yourself ─────────────────────────────────────────────────────────
     function startHearYourself() {
       if (!localStream || loopbackAudio) return;
       hearYourself = true;
-
-      // Connect mic → AudioContext destination (speakers) at reduced gain to prevent feedback
       try {
         loopbackCtx = new (window.AudioContext || window.webkitAudioContext)();
         const src  = loopbackCtx.createMediaStreamSource(localStream);
         const gain = loopbackCtx.createGain();
-        gain.gain.value = 0.85; // slight reduction to reduce feedback risk
+        gain.gain.value = 0.85;
         src.connect(gain);
         gain.connect(loopbackCtx.destination);
       } catch(e) {
-        // Fallback: plain audio element loopback
         loopbackAudio = document.createElement('audio');
         loopbackAudio.autoplay = true;
         loopbackAudio.setAttribute('playsinline', '');
@@ -5212,230 +5165,158 @@
         loopbackAudio.srcObject = localStream;
         document.body.appendChild(loopbackAudio);
       }
-
       hearBtn.classList.add('active');
-      hearBtn.innerHTML = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
-          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
-        </svg>
-        Hearing yourself…`;
+      hearBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Hearing yourself…`;
     }
-
     function stopHearYourself() {
       hearYourself = false;
-      if (loopbackCtx) {
-        try { loopbackCtx.close(); } catch(e) {}
-        loopbackCtx = null;
-      }
-      if (loopbackAudio) {
-        loopbackAudio.srcObject = null;
-        loopbackAudio.remove();
-        loopbackAudio = null;
-      }
+      if (loopbackCtx) { try { loopbackCtx.close(); } catch(e) {} loopbackCtx = null; }
+      if (loopbackAudio) { loopbackAudio.srcObject = null; loopbackAudio.remove(); loopbackAudio = null; }
       hearBtn.classList.remove('active');
-      hearBtn.innerHTML = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
-          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
-        </svg>
-        Hear yourself`;
+      hearBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Hear yourself`;
     }
+    function toggleHearYourself() { if (hearYourself) stopHearYourself(); else startHearYourself(); }
 
-    function toggleHearYourself() {
-      if (hearYourself) stopHearYourself();
-      else startHearYourself();
-    }
-
+    // ── Speaking loop ─────────────────────────────────────────────────────────
     function startSpeakLoop() {
       if (speakTick) return;
       speakTick = setInterval(() => {
-        // local speaking
-        if (localAnalyser) {
-          const speaking = isSpeaking(myUid, localAnalyser.analyser, localAnalyser.dataArr);
-          updateSpeakingUI(myUid, speaking);
-        }
-        // remote speaking
+        if (localAnalyser) updateSpeakingUI(myUid, isSpeaking(myUid, localAnalyser.analyser, localAnalyser.dataArr));
         Object.entries(peers).forEach(([uid, p]) => {
-          if (p.analyser) {
-            const speaking = isSpeaking(uid, p.analyser.analyser, p.analyser.dataArr);
-            updateSpeakingUI(uid, speaking);
-          }
+          if (p.analyser) updateSpeakingUI(uid, isSpeaking(uid, p.analyser.analyser, p.analyser.dataArr));
         });
       }, 80);
     }
-
-    function stopSpeakLoop() {
-      if (speakTick) { clearInterval(speakTick); speakTick = null; }
-    }
-
+    function stopSpeakLoop() { if (speakTick) { clearInterval(speakTick); speakTick = null; } }
     function updateSpeakingUI(uid, speaking) {
       const el = document.querySelector(`.voice-avatar[data-uid="${uid}"]`);
       if (!el) return;
-      if (speaking) {
-        el.classList.add('speaking');
-      } else {
-        el.classList.remove('speaking');
-      }
+      el.classList.toggle('speaking', speaking);
     }
 
     // ── Participant UI ────────────────────────────────────────────────────────
     function renderParticipants(roomData) {
       const parts = roomData.participants || {};
       participants.innerHTML = '';
-      const isAdmin = (() => {
-        try {
-          const u = auth.currentUser;
-          return u && window._currentProfile && window._currentProfile.isAdmin;
-        } catch(e) { return false; }
-      })();
-
+      const isAdmin = (() => { try { return auth.currentUser && window._currentProfile && window._currentProfile.isAdmin; } catch(e) { return false; } })();
       Object.entries(parts).forEach(([uid, info]) => {
         const isSelf = uid === myUid;
         const name   = info.displayName || 'User';
         const photo  = info.photoData   || null;
         const muted  = info.muted       || false;
-
-        const row  = document.createElement('div');
+        const row    = document.createElement('div');
         row.className = 'voice-participant' + (muted ? ' muted' : '');
         row.innerHTML = `
           <div class="voice-avatar" data-uid="${uid}">${avatarHTML(name, photo)}</div>
           <span class="voice-participant-name">${name}${isSelf ? ' (you)' : ''}</span>
           <span class="voice-participant-muted">🔇</span>
-          ${isAdmin && !isSelf ? `<button class="voice-kick-btn" data-uid="${uid}" data-name="${name}" title="Kick from voice">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            Kick
-          </button>` : ''}
-        `;
+          ${isAdmin && !isSelf ? `<button class="voice-kick-btn" data-uid="${uid}" data-name="${name}" title="Kick from voice"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Kick</button>` : ''}`;
         participants.appendChild(row);
       });
-
-      // Wire kick buttons
       participants.querySelectorAll('.voice-kick-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const uid = btn.dataset.uid;
-          const name = btn.dataset.name;
+          const uid = btn.dataset.uid, name = btn.dataset.name;
           if (!confirm(`Kick ${name} from voice chat?`)) return;
           try {
-            await ROOM_REF().update({
-              [`participants.${uid}`]: firebase.firestore.FieldValue.delete()
-            });
-            // Write a kick signal so their client auto-leaves
-            await ROOM_REF().collection('kicks').doc(uid).set({
-              kickedAt: firebase.firestore.FieldValue.serverTimestamp(),
-              kickedBy: myUid
-            });
-          } catch(e) { console.error('kick error', e); }
+            await ROOM_REF().update({ [`participants.${uid}`]: firebase.firestore.FieldValue.delete() });
+            await ROOM_REF().collection('kicks').doc(uid).set({ kickedAt: firebase.firestore.FieldValue.serverTimestamp(), kickedBy: myUid });
+          } catch(e) { console.error('[voice] kick error', e); }
         });
       });
-
       const count = Object.keys(parts).length;
       setStatus(count === 1 ? 'Only you — invite someone!' : `${count} in voice`);
     }
 
     // ── Firestore room helpers ────────────────────────────────────────────────
     async function joinRoomDoc() {
-      const participantData = {
-        displayName: _cachedName  || 'User',
-        photoData:   _cachedPhoto || null,
-        muted: false,
-        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      // update() handles dot-notation as true nested paths — won't overwrite other participants.
-      // Falls back to set() if the document doesn't exist yet (first person in the channel).
-      try {
-        await ROOM_REF().update({ [`participants.${myUid}`]: participantData });
-      } catch(e) {
-        // Document doesn't exist — create it with this participant
-        await ROOM_REF().set({ participants: { [myUid]: participantData } });
-      }
+      const data = { displayName: _cachedName||'User', photoData: _cachedPhoto||null, muted: false, joinedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      try { await ROOM_REF().update({ [`participants.${myUid}`]: data }); }
+      catch(e) { await ROOM_REF().set({ participants: { [myUid]: data } }); }
     }
-
     async function leaveRoomDoc() {
-      await ROOM_REF().update({
-        [`participants.${myUid}`]: firebase.firestore.FieldValue.delete()
-      }).catch(() => {});
+      await ROOM_REF().update({ [`participants.${myUid}`]: firebase.firestore.FieldValue.delete() }).catch(() => {});
+    }
+    async function setMutedInRoom(muted) {
+      await ROOM_REF().update({ [`participants.${myUid}.muted`]: muted }).catch(() => {});
     }
 
-    async function setMutedInRoom(muted) {
-      await ROOM_REF().update({
-        [`participants.${myUid}.muted`]: muted
-      }).catch(() => {});
+    // ── Signal delivery — per-user inbox path ─────────────────────────────────
+    // Signals go to INBOX_REF(recipientUid) so the path itself grants access.
+    // No collection-group query needed — each user only reads their own inbox.
+    async function sendSignal(toUid, type, payload) {
+      if (!inVoice) return;
+      try {
+        await INBOX_REF(toUid).add({
+          from: myUid, to: toUid, type, payload,
+          ts: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch(e) { console.warn('[voice] sendSignal error:', type, e); }
+    }
+
+    async function purgeMyInbox() {
+      try {
+        const snap  = await INBOX_REF(myUid).get();
+        if (snap.empty) return;
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } catch(e) { console.warn('[voice] inbox purge error:', e); }
     }
 
     // ── WebRTC peer management ────────────────────────────────────────────────
-    // pendingIce[uid] = array of ICE candidates queued before remote desc is set
-    const pendingIce = {};
-
     async function createPeer(remoteUid, polite) {
-      if (peers[remoteUid]) return peers[remoteUid].pc;
+      // Double-guard: check both the peers map and the in-flight lock
+      if (peers[remoteUid] || peersLock.has(remoteUid)) return peers[remoteUid]?.pc ?? null;
+      peersLock.add(remoteUid);
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
-      peers[remoteUid] = { pc, stream: null, analyser: null, hasRemote: false };
+      peers[remoteUid]    = { pc, stream: null, analyser: null, hasRemote: false, polite };
       pendingIce[remoteUid] = [];
 
-      // Add local tracks BEFORE setting up negotiation handlers
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-      // ICE candidates → Firestore (only after we have tracks)
       pc.onicecandidate = ({ candidate }) => {
-        if (!candidate) return;
-        SIGS_REF().add({
-          from: myUid, to: remoteUid,
-          type: 'ice', payload: candidate.toJSON(),
-          ts: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(() => {});
+        if (!candidate || !inVoice) return;
+        sendSignal(remoteUid, 'ice', candidate.toJSON());
       };
 
-      // Remote stream → hidden audio element
       pc.ontrack = ({ streams }) => {
-        if (!streams || !streams[0]) return;
+        if (!streams?.[0]) return;
         const stream = streams[0];
         peers[remoteUid].stream = stream;
 
-        const existing = document.getElementById(`voice-audio-${remoteUid}`);
-        if (existing) { existing.srcObject = stream; return; }
-
-        const audio = document.createElement('audio');
-        audio.autoplay = true;
-        audio.setAttribute('playsinline', '');
-        audio.setAttribute('webkit-playsinline', '');
-        audio.muted = false;
-        audio.volume = 1.0;
-        audio.id = `voice-audio-${remoteUid}`;
-        document.body.appendChild(audio);
-
-        // Set srcObject then attempt play — resume AudioContext first
+        let audio = document.getElementById(`voice-audio-${remoteUid}`);
+        if (!audio) {
+          audio = document.createElement('audio');
+          audio.autoplay = true;
+          audio.setAttribute('playsinline', '');
+          audio.setAttribute('webkit-playsinline', '');
+          audio.muted = false;
+          audio.volume = 1.0;
+          audio.id = `voice-audio-${remoteUid}`;
+          document.body.appendChild(audio);
+        }
         audio.srcObject = stream;
-        const tryPlay = () => {
-          getAudioCtx().resume().catch(() => {});
-          audio.play().catch(() => {});
-        };
+        const tryPlay = () => { getAudioCtx().resume().catch(()=>{}); audio.play().catch(()=>{}); };
         tryPlay();
-        // Retry on next user interaction in case autoplay was blocked
         document.addEventListener('click',      tryPlay, { once: true });
         document.addEventListener('touchstart', tryPlay, { once: true });
 
-        const an = makeAnalyser(stream);
-        if (an) peers[remoteUid].analyser = an;
-      };
-
-      pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        if (state === 'failed') {
-          // Try ICE restart
-          if (!polite) sendOffer(remoteUid, pc, true);
+        if (!peers[remoteUid]?.analyser) {
+          const an = makeAnalyser(stream);
+          if (an && peers[remoteUid]) peers[remoteUid].analyser = an;
         }
       };
 
-      // Only the IMPOLITE peer (lower UID) initiates the offer
-      if (!polite) {
-        await sendOffer(remoteUid, pc, false);
-      }
+      pc.onconnectionstatechange = () => {
+        const s = pc.connectionState;
+        console.log(`[voice] ${remoteUid} → ${s}`);
+        if (s === 'failed' && !polite && inVoice) sendOffer(remoteUid, pc, true);
+      };
+
+      peersLock.delete(remoteUid);
+
+      if (!polite) await sendOffer(remoteUid, pc, false);
 
       return pc;
     }
@@ -5444,22 +5325,16 @@
       try {
         const offer = await pc.createOffer(iceRestart ? { iceRestart: true } : {});
         await pc.setLocalDescription(offer);
-        await SIGS_REF().add({
-          from: myUid, to: remoteUid,
-          type: 'offer', payload: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
-          ts: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      } catch(e) {
-        console.warn('sendOffer error:', e);
-      }
+        await sendSignal(remoteUid, 'offer', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+      } catch(e) { console.warn('[voice] sendOffer error:', e); }
     }
 
     async function drainPendingIce(remoteUid) {
       const p = peers[remoteUid];
-      if (!p || !p.hasRemote) return;
-      const queue = pendingIce[remoteUid] || [];
-      while (queue.length) {
-        const c = queue.shift();
+      if (!p?.hasRemote) return;
+      const q = pendingIce[remoteUid] || [];
+      while (q.length) {
+        const c = q.shift();
         try { await p.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
       }
     }
@@ -5467,74 +5342,68 @@
     function closePeer(remoteUid) {
       const p = peers[remoteUid];
       if (!p) return;
-      p.pc.close();
+      try { p.pc.close(); } catch(e) {}
       delete peers[remoteUid];
       delete pendingIce[remoteUid];
       delete speakSmooth[remoteUid];
+      peersLock.delete(remoteUid);
       const audio = document.getElementById(`voice-audio-${remoteUid}`);
       if (audio) { audio.srcObject = null; audio.remove(); }
     }
 
-    // ── Signal listener ────────────────────────────────────────────────────────
+    // ── Signal listener — listens to OUR inbox ────────────────────────────────
     function listenSignals() {
-      sigsUnsub = SIGS_REF()
-        .where('to', '==', myUid)
-        .onSnapshot(snap => {
+      // No orderBy — avoids composite index requirement. Serial queues per peer
+      // handle ordering anyway.
+      sigsUnsub = INBOX_REF(myUid)
+        .onSnapshot({ includeMetadataChanges: false }, snap => {
           snap.docChanges().forEach(change => {
             if (change.type !== 'added') return;
             const sig = change.doc.data();
-            // Delete signal immediately so other clients don't process it
             change.doc.ref.delete().catch(() => {});
-            // Queue processing per-peer to avoid races
-            handleSignal(sig);
+            if (!inVoice) return;
+            enqueueSignal(sig);
           });
-        }, err => console.warn('signals listener error:', err));
+        }, err => console.warn('[voice] signals listener error:', err));
     }
 
-    // Per-peer serial signal queue to prevent race conditions
-    const sigQueues = {};
-
-    function handleSignal(sig) {
-      const fromUid = sig.from;
-      if (!sigQueues[fromUid]) sigQueues[fromUid] = Promise.resolve();
-      sigQueues[fromUid] = sigQueues[fromUid].then(() => processSignal(sig)).catch(e => console.warn('signal processing error:', e));
+    function enqueueSignal(sig) {
+      const from = sig.from;
+      const mySession = sessionId;
+      if (!sigQueues[from]) sigQueues[from] = Promise.resolve();
+      sigQueues[from] = sigQueues[from]
+        .then(() => {
+          if (sessionId !== mySession || !inVoice) return;
+          return processSignal(sig);
+        })
+        .catch(e => console.warn('[voice] processSignal error:', e));
     }
 
     async function processSignal(sig) {
       const fromUid = sig.from;
-      const polite  = myUid > fromUid; // deterministic: higher UID is polite
+      const polite  = myUid > fromUid; // higher UID = polite (defers to the other's offer)
 
-      // Create peer if it doesn't exist yet (the remote user joined before us)
-      if (!peers[fromUid]) {
+      if (!peers[fromUid] && !peersLock.has(fromUid)) {
         await createPeer(fromUid, polite);
       }
+      // Wait if peer is being created concurrently
+      let attempts = 0;
+      while (peersLock.has(fromUid) && attempts++ < 20) await new Promise(r => setTimeout(r, 50));
 
-      const p  = peers[fromUid];
-      if (!p) return;
+      const p = peers[fromUid];
+      if (!p) { console.warn('[voice] no peer for', fromUid); return; }
       const pc = p.pc;
 
       if (sig.type === 'offer') {
-        // Polite peer always accepts; impolite peer ignores if it's also making an offer
-        const offerCollision = pc.signalingState !== 'stable';
-        const ignoreOffer    = offerCollision && !polite;
-        if (ignoreOffer) return;
-
-        // Rollback our own offer if we were making one (polite peer)
-        if (offerCollision) {
-          await pc.setLocalDescription({ type: 'rollback' });
-        }
-
+        const collision = pc.signalingState !== 'stable';
+        if (collision && !polite) return; // impolite ignores colliding offers
+        if (collision) await pc.setLocalDescription({ type: 'rollback' });
         await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
         p.hasRemote = true;
         await drainPendingIce(fromUid);
-
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        await SIGS_REF().add({
-          from: myUid, to: fromUid,
-          type: 'answer', payload: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
-          ts: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        await sendSignal(fromUid, 'answer', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
 
       } else if (sig.type === 'answer') {
         if (pc.signalingState !== 'have-local-offer') return;
@@ -5546,7 +5415,6 @@
         if (p.hasRemote) {
           try { await pc.addIceCandidate(new RTCIceCandidate(sig.payload)); } catch(e) {}
         } else {
-          // Queue candidates until remote description is set
           (pendingIce[fromUid] = pendingIce[fromUid] || []).push(sig.payload);
         }
       }
@@ -5555,194 +5423,155 @@
     // ── Room listener ─────────────────────────────────────────────────────────
     function listenRoom() {
       roomUnsub = ROOM_REF().onSnapshot(snap => {
-        if (!snap.exists) return;
+        if (!snap.exists || !inVoice) return;
         const data  = snap.data();
         renderParticipants(data);
-
         const parts = data.participants || {};
 
-        // Disconnect peers who left the room
-        Object.keys(peers).forEach(uid => {
-          if (!parts[uid]) closePeer(uid);
-        });
+        // Close peers for people who left
+        Object.keys(peers).forEach(uid => { if (!parts[uid]) closePeer(uid); });
 
-        // Connect to new participants who joined after us.
-        // We only initiate as the impolite (lower UID) peer — the polite peer
-        // waits to receive the offer. This avoids duplicate connections.
+        // Connect to participants we don't have a peer for yet.
+        // BOTH peers call createPeer — createPeer itself decides who sends the
+        // offer based on the polite flag (impolite = lower UID = sends offer).
+        // This ensures a connection is always initiated regardless of join order.
         Object.keys(parts).forEach(uid => {
-          if (uid === myUid) return;
-          if (peers[uid]) return; // already connected
+          if (uid === myUid || peers[uid] || peersLock.has(uid)) return;
           const polite = myUid > uid; // higher UID is polite (waits for offer)
-          if (!polite) {
-            // We are impolite → we send the offer
-            createPeer(uid, false).catch(e => console.warn('peer creation error:', e));
-          }
-          // Polite peer doesn't initiate — it waits for the offer via listenSignals
+          createPeer(uid, polite).catch(e => console.warn('[voice] createPeer error:', e));
         });
-      }, err => console.warn('room listener error:', err));
+      }, err => console.warn('[voice] room listener error:', err));
     }
 
-    // ── Preview: show who's in VC before joining ───────────────────────────────
+    // ── Preview listener ──────────────────────────────────────────────────────
     function listenPreview() {
       previewUnsub = ROOM_REF().onSnapshot(snap => {
-        if (inVoice) return; // don't update preview while inside
+        if (inVoice) return;
         const parts = snap.exists ? (snap.data().participants || {}) : {};
         const count = Object.keys(parts).length;
-
-        if (count === 0) {
-          previewPanel.style.display = 'none';
-          countBadge.style.display = 'none';
-        } else {
-          previewPanel.style.display = 'block';
-          countBadge.style.display = 'inline';
-          countBadge.textContent = `${count} in voice`;
-          previewList.innerHTML = '';
-          Object.entries(parts).forEach(([uid, info]) => {
-            const name  = info.displayName || 'User';
-            const photo = info.photoData   || null;
-            const item = document.createElement('div');
-            item.className = 'voice-preview-item';
-            item.innerHTML = `
-              <div class="voice-preview-avatar">${photo ? `<img src="${photo}" alt="${name}" />` : initials(name)}</div>
-              <span>${name}</span>
-              ${info.muted ? '<span style="font-size:10px;opacity:0.6;">🔇</span>' : ''}
-            `;
-            previewList.appendChild(item);
-          });
-        }
+        if (count === 0) { previewPanel.style.display='none'; countBadge.style.display='none'; return; }
+        previewPanel.style.display = 'block';
+        countBadge.style.display   = 'inline';
+        countBadge.textContent     = `${count} in voice`;
+        previewList.innerHTML      = '';
+        Object.entries(parts).forEach(([uid, info]) => {
+          const name = info.displayName || 'User', photo = info.photoData || null;
+          const item = document.createElement('div');
+          item.className = 'voice-preview-item';
+          item.innerHTML = `<div class="voice-preview-avatar">${photo ? `<img src="${photo}" alt="${name}" />` : initials(name)}</div><span>${name}</span>${info.muted ? '<span style="font-size:10px;opacity:0.6;">🔇</span>' : ''}`;
+          previewList.appendChild(item);
+        });
       }, () => {});
     }
 
-    // ── Kick listener: auto-leave if admin kicked us ───────────────────────────
+    // ── Kick listener ─────────────────────────────────────────────────────────
     function listenKicks() {
       if (!myUid) return;
-      kickUnsub = ROOM_REF().collection('kicks').doc(myUid)
-        .onSnapshot(snap => {
-          if (!snap.exists) return;
-          // Clean up the kick doc so it doesn't trigger again
-          snap.ref.delete().catch(() => {});
-          if (inVoice) {
-            setStatus('You were removed from voice.');
-            leaveVoice();
-          }
-        }, () => {});
+      kickUnsub = ROOM_REF().collection('kicks').doc(myUid).onSnapshot(snap => {
+        if (!snap.exists) return;
+        snap.ref.delete().catch(() => {});
+        if (inVoice) { setStatus('You were removed from voice.'); leaveVoice(); }
+      }, () => {});
     }
 
-    // ── Join / Leave ──────────────────────────────────────────────────────────
+    // ── Join ──────────────────────────────────────────────────────────────────
     async function joinVoice() {
-      const user = auth.currentUser;   // use Firebase SDK directly — always reliable
-      if (!user) {
-        alert('Sign in to use voice chat.');
-        return;
-      }
+      const user = auth.currentUser;
+      if (!user) { alert('Sign in to use voice chat.'); return; }
+      if (inVoice) return;
 
       myUid = user.uid;
+      sessionId++;
       setStatus('Fetching profile…');
-
-      // Fetch name/photo fresh from Firestore so we always get the real display name
       await fetchMyProfile();
 
       setStatus('Requesting microphone…');
-
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      // Ensure AudioContext is running (browsers may auto-suspend it)
-      getAudioCtx().resume().catch(() => {});
+        getAudioCtx().resume().catch(() => {});
       } catch(e) {
-        setStatus('Microphone access denied.');
-        console.error(e);
-        return;
+        setStatus('Microphone access denied. Check browser permissions.');
+        console.error(e); return;
       }
 
-      // Local speaking indicator
       const an = makeAnalyser(localStream);
       if (an) localAnalyser = an;
-
       inVoice = true;
-      joinBtn.classList.add('active');
-      joinBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-        </svg>
-        Connected`;
-      livePanel.classList.add('open');
 
-      await joinRoomDoc();
+      // 1. Purge any stale signals from previous sessions
+      await purgeMyInbox();
 
-      // Initiate connections to anyone already in the room.
-      // Only the impolite peer (lower UID) sends the offer, so we create a peer
-      // for every existing participant — createPeer handles the polite/impolite logic.
-      try {
-        const roomSnap = await ROOM_REF().get();
-        if (roomSnap.exists) {
-          const parts = roomSnap.data().participants || {};
-          for (const uid of Object.keys(parts)) {
-            if (uid === myUid) continue;
-            if (!peers[uid]) {
-              const polite = myUid > uid;
-              await createPeer(uid, polite);
-            }
-          }
-        }
-      } catch(e) { console.warn('initial peer setup error:', e); }
-
-      listenRoom();
+      // 2. Listen for signals BEFORE writing to room
+      //    so we don't miss offers from peers who react instantly to our join
       listenSignals();
       listenKicks();
+
+      // 3. Write ourselves into the room doc
+      await joinRoomDoc();
+
+      // 4. Connect to peers already present at join time.
+      //    BOTH polite and impolite peers call createPeer — the polite/impolite
+      //    flag inside createPeer determines who actually sends the offer.
+      //    This guarantees a connection attempt regardless of join order.
+      try {
+        const snap = await ROOM_REF().get();
+        if (snap.exists) {
+          const parts = snap.data().participants || {};
+          for (const uid of Object.keys(parts)) {
+            if (uid === myUid || peers[uid] || peersLock.has(uid)) continue;
+            const polite = myUid > uid;
+            await createPeer(uid, polite);
+          }
+        }
+      } catch(e) { console.warn('[voice] initial peer setup error:', e); }
+
+      // 5. Watch room for future joins/leaves
+      listenRoom();
       startSpeakLoop();
       startMicMeter();
-      // Hide preview panel while in voice
+
+      joinBtn.classList.add('active');
+      joinBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg> Connected`;
+      livePanel.classList.add('open');
       previewPanel.style.display = 'none';
-      countBadge.style.display = 'none';
+      countBadge.style.display   = 'none';
       setStatus('You joined voice.');
     }
 
+    // ── Leave ─────────────────────────────────────────────────────────────────
     async function leaveVoice() {
       if (!inVoice) return;
       inVoice = false;
+      sessionId++; // immediately invalidates all queued signal callbacks
 
       stopSpeakLoop();
       stopMicMeter();
       stopHearYourself();
 
+      // Unsub listeners first — no more callbacks
       if (sigsUnsub) { sigsUnsub(); sigsUnsub = null; }
       if (roomUnsub) { roomUnsub(); roomUnsub = null; }
       if (kickUnsub) { kickUnsub(); kickUnsub = null; }
 
-      Object.keys(peers).forEach(uid => closePeer(uid));
-      // Clear per-peer signal queues
+      // Flush signal queues
       Object.keys(sigQueues).forEach(k => delete sigQueues[k]);
 
-      if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        localStream = null;
-      }
+      // Close all peers
+      Object.keys(peers).forEach(uid => closePeer(uid));
+      peersLock.clear();
       localAnalyser = null;
+
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
 
       await leaveRoomDoc();
 
       joinBtn.classList.remove('active');
-      joinBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-          <line x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
-        Join Voice`;
+      joinBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Join Voice`;
       livePanel.classList.remove('open');
       participants.innerHTML = '';
       isMuted = false;
       muteBtn.classList.remove('muted-state');
-      muteBtn.innerHTML = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-        </svg>
-        Mute`;
+      muteBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg> Mute`;
       setStatus('');
     }
 
@@ -5751,44 +5580,23 @@
       isMuted = !isMuted;
       localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
       setMutedInRoom(isMuted);
-
       muteBtn.classList.toggle('muted-state', isMuted);
       if (isMuted) {
-        muteBtn.innerHTML = `
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="1" y1="1" x2="23" y2="23"/>
-            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-          </svg>
-          Unmute`;
+        muteBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/></svg> Unmute`;
       } else {
-        muteBtn.innerHTML = `
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-          </svg>
-          Mute`;
+        muteBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg> Mute`;
       }
     }
 
-    // ── Clean up on tab close ─────────────────────────────────────────────────
-    window.addEventListener('beforeunload', () => {
-      if (inVoice) leaveRoomDoc();
-    });
+    // ── Cleanup on tab close ──────────────────────────────────────────────────
+    window.addEventListener('beforeunload', () => { if (inVoice) leaveRoomDoc(); });
 
     // ── Wire buttons ──────────────────────────────────────────────────────────
-    joinBtn.addEventListener('click', () => {
-      if (inVoice) leaveVoice();
-      else joinVoice();
-    });
+    joinBtn.addEventListener('click', () => { if (inVoice) leaveVoice(); else joinVoice(); });
     muteBtn.addEventListener('click', toggleMute);
     leaveBtn.addEventListener('click', leaveVoice);
     hearBtn.addEventListener('click', toggleHearYourself);
 
-    // ── Start preview listener (shows who's in VC before you join) ────────────
-    // Wait a tick so Firebase is initialised by the main script
     setTimeout(() => { try { listenPreview(); } catch(e) {} }, 1200);
   })();
   </script>
