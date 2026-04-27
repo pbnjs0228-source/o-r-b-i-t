@@ -5332,31 +5332,35 @@
     }
 
     // ── WebRTC peer management ────────────────────────────────────────────────
+    // pendingIce[uid] = array of ICE candidates queued before remote desc is set
+    const pendingIce = {};
+
     async function createPeer(remoteUid, polite) {
       if (peers[remoteUid]) return peers[remoteUid].pc;
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
-      peers[remoteUid] = { pc, stream: null, analyser: null };
+      peers[remoteUid] = { pc, stream: null, analyser: null, hasRemote: false };
+      pendingIce[remoteUid] = [];
 
-      // Add local tracks
+      // Add local tracks BEFORE setting up negotiation handlers
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-      // ICE candidates → Firestore
+      // ICE candidates → Firestore (only after we have tracks)
       pc.onicecandidate = ({ candidate }) => {
         if (!candidate) return;
         SIGS_REF().add({
           from: myUid, to: remoteUid,
           type: 'ice', payload: candidate.toJSON(),
           ts: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        }).catch(() => {});
       };
 
       // Remote stream → hidden audio element
       pc.ontrack = ({ streams }) => {
+        if (!streams || !streams[0]) return;
         const stream = streams[0];
         peers[remoteUid].stream = stream;
 
-        // Remove any existing audio element first
         const existing = document.getElementById(`voice-audio-${remoteUid}`);
         if (existing) existing.remove();
 
@@ -5365,59 +5369,59 @@
         audio.setAttribute('playsinline', '');
         audio.setAttribute('webkit-playsinline', '');
         audio.muted = false;
+        audio.volume = 1.0;
         audio.srcObject = stream;
         audio.id = `voice-audio-${remoteUid}`;
         document.body.appendChild(audio);
 
-        // iOS requires a user gesture to play — try playing and handle the promise
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            // Auto-play blocked; wait for next user interaction
-            const unlockAudio = () => {
-              audio.play().catch(() => {});
-              document.removeEventListener('touchstart', unlockAudio);
-              document.removeEventListener('click', unlockAudio);
-            };
-            document.addEventListener('touchstart', unlockAudio, { once: true });
-            document.addEventListener('click', unlockAudio, { once: true });
-          });
-        }
+        audio.play().catch(() => {
+          const unlock = () => { audio.play().catch(() => {}); };
+          document.addEventListener('click',      unlock, { once: true });
+          document.addEventListener('touchstart', unlock, { once: true });
+        });
 
         const an = makeAnalyser(stream);
         if (an) peers[remoteUid].analyser = an;
       };
 
-      // Negotiation (perfect negotiation pattern)
-      let makingOffer = false;
-      let ignoreOffer = false;
-
-      pc.onnegotiationneeded = async () => {
-        try {
-          makingOffer = true;
-          await pc.setLocalDescription();
-          SIGS_REF().add({
-            from: myUid, to: remoteUid,
-            type: 'offer', payload: pc.localDescription.toJSON(),
-            ts: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        } catch(e) { console.error('offer err', e); }
-        finally { makingOffer = false; }
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        if (state === 'failed') {
+          // Try ICE restart
+          if (!polite) sendOffer(remoteUid, pc, true);
+        }
       };
 
-      // If we are the "impolite" peer and uid sort says we initiate, trigger offer
+      // Only the IMPOLITE peer (lower UID) initiates the offer
       if (!polite) {
-        try {
-          await pc.setLocalDescription();
-          SIGS_REF().add({
-            from: myUid, to: remoteUid,
-            type: 'offer', payload: pc.localDescription.toJSON(),
-            ts: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        } catch(e) {}
+        await sendOffer(remoteUid, pc, false);
       }
 
       return pc;
+    }
+
+    async function sendOffer(remoteUid, pc, iceRestart) {
+      try {
+        const offer = await pc.createOffer(iceRestart ? { iceRestart: true } : {});
+        await pc.setLocalDescription(offer);
+        await SIGS_REF().add({
+          from: myUid, to: remoteUid,
+          type: 'offer', payload: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
+          ts: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch(e) {
+        console.warn('sendOffer error:', e);
+      }
+    }
+
+    async function drainPendingIce(remoteUid) {
+      const p = peers[remoteUid];
+      if (!p || !p.hasRemote) return;
+      const queue = pendingIce[remoteUid] || [];
+      while (queue.length) {
+        const c = queue.shift();
+        try { await p.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+      }
     }
 
     function closePeer(remoteUid) {
@@ -5425,6 +5429,7 @@
       if (!p) return;
       p.pc.close();
       delete peers[remoteUid];
+      delete pendingIce[remoteUid];
       const audio = document.getElementById(`voice-audio-${remoteUid}`);
       if (audio) audio.remove();
     }
@@ -5434,63 +5439,97 @@
       sigsUnsub = SIGS_REF()
         .where('to', '==', myUid)
         .orderBy('ts', 'asc')
-        .onSnapshot(async snap => {
-          for (const change of snap.docChanges()) {
-            if (change.type !== 'added') continue;
+        .onSnapshot(snap => {
+          snap.docChanges().forEach(change => {
+            if (change.type !== 'added') return;
             const sig = change.doc.data();
-            const fromUid = sig.from;
-            // delete processed signal
+            // Delete signal immediately so other clients don't process it
             change.doc.ref.delete().catch(() => {});
+            // Queue processing per-peer to avoid races
+            handleSignal(sig);
+          });
+        }, err => console.warn('signals listener error:', err));
+    }
 
-            const polite = myUid > fromUid; // deterministic politeness
-            let pc = peers[fromUid] ? peers[fromUid].pc : await createPeer(fromUid, polite);
+    // Per-peer serial signal queue to prevent race conditions
+    const sigQueues = {};
 
-            if (sig.type === 'offer') {
-              const offerCollision = pc.signalingState !== 'stable' && !polite;
-              if (offerCollision) continue;
-              await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
-              await pc.setLocalDescription();
-              SIGS_REF().add({
-                from: myUid, to: fromUid,
-                type: 'answer', payload: pc.localDescription.toJSON(),
-                ts: firebase.firestore.FieldValue.serverTimestamp()
-              });
-            } else if (sig.type === 'answer') {
-              if (pc.signalingState === 'have-local-offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
-              }
-            } else if (sig.type === 'ice') {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
-              } catch(e) {}
-            }
-          }
-        }, err => console.error('signals error', err));
+    function handleSignal(sig) {
+      const fromUid = sig.from;
+      if (!sigQueues[fromUid]) sigQueues[fromUid] = Promise.resolve();
+      sigQueues[fromUid] = sigQueues[fromUid].then(() => processSignal(sig)).catch(e => console.warn('signal processing error:', e));
+    }
+
+    async function processSignal(sig) {
+      const fromUid = sig.from;
+      const polite  = myUid > fromUid; // deterministic: higher UID is polite
+
+      // Create peer if it doesn't exist yet (the remote user joined before us)
+      if (!peers[fromUid]) {
+        await createPeer(fromUid, polite);
+      }
+
+      const p  = peers[fromUid];
+      if (!p) return;
+      const pc = p.pc;
+
+      if (sig.type === 'offer') {
+        // Polite peer always accepts; impolite peer ignores if it's also making an offer
+        const offerCollision = pc.signalingState !== 'stable';
+        const ignoreOffer    = offerCollision && !polite;
+        if (ignoreOffer) return;
+
+        // Rollback our own offer if we were making one (polite peer)
+        if (offerCollision) {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+
+        await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+        p.hasRemote = true;
+        await drainPendingIce(fromUid);
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await SIGS_REF().add({
+          from: myUid, to: fromUid,
+          type: 'answer', payload: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
+          ts: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+      } else if (sig.type === 'answer') {
+        if (pc.signalingState !== 'have-local-offer') return;
+        await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+        p.hasRemote = true;
+        await drainPendingIce(fromUid);
+
+      } else if (sig.type === 'ice') {
+        if (p.hasRemote) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(sig.payload)); } catch(e) {}
+        } else {
+          // Queue candidates until remote description is set
+          (pendingIce[fromUid] = pendingIce[fromUid] || []).push(sig.payload);
+        }
+      }
     }
 
     // ── Room listener ─────────────────────────────────────────────────────────
     function listenRoom() {
       roomUnsub = ROOM_REF().onSnapshot(snap => {
         if (!snap.exists) return;
-        const data = snap.data();
+        const data  = snap.data();
         renderParticipants(data);
 
         const parts = data.participants || {};
 
-        // Connect to any new participant
-        Object.keys(parts).forEach(uid => {
-          if (uid === myUid) return;
-          if (!peers[uid]) {
-            const polite = myUid > uid;
-            createPeer(uid, polite);
-          }
-        });
-
-        // Disconnect from anyone who left
+        // Disconnect peers who left the room
         Object.keys(peers).forEach(uid => {
           if (!parts[uid]) closePeer(uid);
         });
-      }, err => console.error('room error', err));
+
+        // NOTE: We do NOT create peers here. Peer creation is triggered
+        // by incoming signals (offers) in listenSignals / processSignal.
+        // Creating peers here races with signaling and causes duplicate connections.
+      }, err => console.warn('room listener error:', err));
     }
 
     // ── Preview: show who's in VC before joining ───────────────────────────────
@@ -5579,6 +5618,24 @@
       livePanel.classList.add('open');
 
       await joinRoomDoc();
+
+      // Initiate connections to anyone already in the room.
+      // Only the impolite peer (lower UID) sends the offer, so we create a peer
+      // for every existing participant — createPeer handles the polite/impolite logic.
+      try {
+        const roomSnap = await ROOM_REF().get();
+        if (roomSnap.exists) {
+          const parts = roomSnap.data().participants || {};
+          for (const uid of Object.keys(parts)) {
+            if (uid === myUid) continue;
+            if (!peers[uid]) {
+              const polite = myUid > uid;
+              await createPeer(uid, polite);
+            }
+          }
+        }
+      } catch(e) { console.warn('initial peer setup error:', e); }
+
       listenRoom();
       listenSignals();
       listenKicks();
@@ -5603,6 +5660,8 @@
       if (kickUnsub) { kickUnsub(); kickUnsub = null; }
 
       Object.keys(peers).forEach(uid => closePeer(uid));
+      // Clear per-peer signal queues
+      Object.keys(sigQueues).forEach(k => delete sigQueues[k]);
 
       if (localStream) {
         localStream.getTracks().forEach(t => t.stop());
