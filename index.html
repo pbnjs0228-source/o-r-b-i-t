@@ -4774,18 +4774,22 @@
     const statusText   = document.getElementById('voiceStatusText');
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    function myDisplayName() {
-      if (typeof currentProfile !== 'undefined' && currentProfile && currentProfile.displayName)
-        return currentProfile.displayName;
-      if (typeof currentUser !== 'undefined' && currentUser)
-        return currentUser.email || 'User';
-      return 'User';
-    }
+    // Cached after Firestore fetch on join — avoids cross-script let scoping issues
+    let _cachedName  = null;
+    let _cachedPhoto = null;
 
-    function myPhotoData() {
-      if (typeof currentProfile !== 'undefined' && currentProfile)
-        return currentProfile.photoData || null;
-      return null;
+    async function fetchMyProfile() {
+      const user = auth.currentUser;
+      if (!user) return;
+      _cachedName  = user.email || 'User';
+      _cachedPhoto = null;
+      try {
+        const doc = await db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          _cachedName  = doc.data().displayName || _cachedName;
+          _cachedPhoto = doc.data().photoData   || null;
+        }
+      } catch(e) { console.warn('voice: could not fetch profile', e); }
     }
 
     function initials(name) {
@@ -4876,14 +4880,20 @@
 
     // ── Firestore room helpers ────────────────────────────────────────────────
     async function joinRoomDoc() {
-      await ROOM_REF().set({
-        [`participants.${myUid}`]: {
-          displayName: myDisplayName(),
-          photoData: myPhotoData(),
-          muted: false,
-          joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }
-      }, { merge: true });
+      const participantData = {
+        displayName: _cachedName  || 'User',
+        photoData:   _cachedPhoto || null,
+        muted: false,
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      // update() handles dot-notation as true nested paths — won't overwrite other participants.
+      // Falls back to set() if the document doesn't exist yet (first person in the channel).
+      try {
+        await ROOM_REF().update({ [`participants.${myUid}`]: participantData });
+      } catch(e) {
+        // Document doesn't exist — create it with this participant
+        await ROOM_REF().set({ participants: { [myUid]: participantData } });
+      }
     }
 
     async function leaveRoomDoc() {
@@ -5041,12 +5051,18 @@
 
     // ── Join / Leave ──────────────────────────────────────────────────────────
     async function joinVoice() {
-      if (typeof currentUser === 'undefined' || !currentUser) {
+      const user = auth.currentUser;   // use Firebase SDK directly — always reliable
+      if (!user) {
         alert('Sign in to use voice chat.');
         return;
       }
 
-      myUid = currentUser.uid;
+      myUid = user.uid;
+      setStatus('Fetching profile…');
+
+      // Fetch name/photo fresh from Firestore so we always get the real display name
+      await fetchMyProfile();
+
       setStatus('Requesting microphone…');
 
       try {
