@@ -102,24 +102,24 @@
     }
 
     body.theme-blue {
-      --bg-body: #e5f0ff;
-      --bg-surface: #ffffff;
-      --bg-subtle: #f3f6ff;
-      --border-subtle: #d0e2ff;
-      --border-strong: #9cb8ff;
-      --text-main: #0f172a;
-      --text-muted: #4b5563;
-      --text-soft: #6b7280;
-      --accent: #1d4ed8;
-      --accent-soft: #dbeafe;
+      --bg-body: #04091a;
+      --bg-surface: #080f26;
+      --bg-subtle: #0c1630;
+      --border-subtle: #152244;
+      --border-strong: #1e3264;
+      --text-main: #c8dcff;
+      --text-muted: #7da4d8;
+      --text-soft: #4d6e9e;
+      --accent: #3b82f6;
+      --accent-soft: #1e3a6e;
       --accent-contrast: #ffffff;
-      --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.12);
-      --shadow-modal: 0 18px 40px rgba(15, 23, 42, 0.2);
-      --input-bg: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(0, 10, 40, 0.55);
+      --shadow-modal: 0 18px 40px rgba(0, 10, 40, 0.7);
+      --input-bg: #080f26;
       --input-border-focus: #60a5fa;
-      --badge-bg: #eff6ff;
-      --badge-border: #bfdbfe;
-      --danger: #b91c1c;
+      --badge-bg: #0c1630;
+      --badge-border: #1e3264;
+      --danger: #f87171;
       --admin-badge-bg: #f97316;
       --admin-badge-text: #ffffff;
     }
@@ -148,24 +148,24 @@
     }
 
     body.theme-red {
-      --bg-body: #fef2f2;
-      --bg-surface: #ffffff;
-      --bg-subtle: #fef2f2;
-      --border-subtle: #fecaca;
-      --border-strong: #fca5a5;
-      --text-main: #111827;
-      --text-muted: #4b5563;
-      --text-soft: #6b7280;
-      --accent: #b91c1c;
-      --accent-soft: #fee2e2;
+      --bg-body: #0f0202;
+      --bg-surface: #180404;
+      --bg-subtle: #1e0505;
+      --border-subtle: #2e0808;
+      --border-strong: #4a0f0f;
+      --text-main: #ffd5d5;
+      --text-muted: #c07070;
+      --text-soft: #7a3f3f;
+      --accent: #ef4444;
+      --accent-soft: #4a0f0f;
       --accent-contrast: #ffffff;
-      --shadow-soft: 0 10px 30px rgba(185, 28, 28, 0.18);
-      --shadow-modal: 0 18px 40px rgba(185, 28, 28, 0.25);
-      --input-bg: #ffffff;
+      --shadow-soft: 0 10px 30px rgba(40, 0, 0, 0.6);
+      --shadow-modal: 0 18px 40px rgba(40, 0, 0, 0.75);
+      --input-bg: #180404;
       --input-border-focus: #f87171;
-      --badge-bg: #fef2f2;
-      --badge-border: #fecaca;
-      --danger: #b91c1c;
+      --badge-bg: #1e0505;
+      --badge-border: #2e0808;
+      --danger: #fca5a5;
       --admin-badge-bg: #f97316;
       --admin-badge-text: #ffffff;
     }
@@ -510,8 +510,8 @@
     }
 
     body.theme-blue .message-bubble {
-      background: #eff6ff;
-      color: #0f172a;
+      background: #0c1630;
+      color: #c8dcff;
     }
 
     body.theme-purple .message-bubble {
@@ -520,8 +520,8 @@
     }
 
     body.theme-red .message-bubble {
-      background: #fee2e2;
-      color: #111827;
+      background: #1e0505;
+      color: #ffd5d5;
     }
 
     .message-row.self .message-bubble {
@@ -543,7 +543,7 @@
     }
 
     body.theme-blue .message-row.self .message-bubble {
-      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #3b82f6 100%);
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #60a5fa 100%);
       color: #eff6ff;
       border-color: transparent;
     }
@@ -555,7 +555,7 @@
     }
 
     body.theme-red .message-row.self .message-bubble {
-      background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #dc2626 100%);
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #f87171 100%);
       color: #fff1f2;
       border-color: transparent;
     }
@@ -601,9 +601,9 @@
 
     body.theme-dark .typing-dot { background: #a78bfa; }
     body.theme-light .typing-dot { background: #6d28d9; }
-    body.theme-blue .typing-dot { background: #3b82f6; }
+    body.theme-blue .typing-dot { background: #60a5fa; }
     body.theme-purple .typing-dot { background: #a855f7; }
-    body.theme-red .typing-dot { background: #ef4444; }
+    body.theme-red .typing-dot { background: #f87171; }
 
     .message-bubble-header {
       display: flex;
@@ -796,6 +796,14 @@
       background: #111827;
     }
 
+    body.theme-blue .btn:hover:not(:disabled) {
+      background: #0c1630;
+    }
+
+    body.theme-red .btn:hover:not(:disabled) {
+      background: #1e0505;
+    }
+
     .btn-primary:hover:not(:disabled) {
       filter: brightness(0.95);
     }
@@ -840,6 +848,18 @@
       background: #020617;
       color: #e5e7eb;
       border-color: #111827;
+    }
+
+    body.theme-blue .theme-select {
+      background: #080f26;
+      color: #c8dcff;
+      border-color: #152244;
+    }
+
+    body.theme-red .theme-select {
+      background: #180404;
+      color: #ffd5d5;
+      border-color: #2e0808;
     }
 
     .modal-backdrop {
@@ -925,6 +945,14 @@
 
     body.theme-dark .modal-tabs {
       background: #020617;
+    }
+
+    body.theme-blue .modal-tabs {
+      background: #04091a;
+    }
+
+    body.theme-red .modal-tabs {
+      background: #0f0202;
     }
 
     .modal-tab {
@@ -2124,11 +2152,19 @@
     }
 
     body.theme-light .channel-header,
-    body.theme-blue .channel-header,
-    body.theme-purple .channel-header,
-    body.theme-red .channel-header {
+    body.theme-purple .channel-header {
       background:
         linear-gradient(135deg, color-mix(in srgb, var(--bg-subtle) 86%, white), color-mix(in srgb, var(--accent-soft) 45%, white));
+    }
+
+    body.theme-blue .channel-header {
+      background: linear-gradient(135deg, rgba(8, 15, 40, 0.97), rgba(12, 22, 55, 0.90));
+      border-color: #152244;
+    }
+
+    body.theme-red .channel-header {
+      background: linear-gradient(135deg, rgba(24, 4, 4, 0.97), rgba(30, 5, 5, 0.90));
+      border-color: #2e0808;
     }
 
     .messages {
@@ -2260,6 +2296,28 @@
       .attach-preview-name {
         max-width: 150px;
       }
+    }
+
+    body.theme-blue .messages {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(59, 130, 246, 0.1), transparent 28%),
+        radial-gradient(circle at 80% 20%, rgba(96, 165, 250, 0.06), transparent 24%),
+        var(--bg-surface);
+    }
+
+    body.theme-red .messages {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(220, 38, 38, 0.1), transparent 28%),
+        radial-gradient(circle at 80% 20%, rgba(248, 113, 113, 0.06), transparent 24%),
+        var(--bg-surface);
+    }
+
+    body.theme-blue .message-bubble {
+      border-color: rgba(59, 130, 246, 0.15);
+    }
+
+    body.theme-red .message-bubble {
+      border-color: rgba(220, 38, 38, 0.18);
     }
 
     /* ── Attach button: full label desktop, icon on mobile ── */
