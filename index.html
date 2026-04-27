@@ -2722,12 +2722,14 @@
     }
 
     @keyframes voicePulse {
-      0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.25); }
-      50% { box-shadow: 0 0 0 6px rgba(34,197,94,0.1); }
+      0%, 100% { box-shadow: 0 0 0 2.5px rgba(34,197,94,0.95), 0 0 10px rgba(34,197,94,0.5); }
+      50%       { box-shadow: 0 0 0 4.5px rgba(34,197,94,0.6), 0 0 18px rgba(34,197,94,0.3); }
     }
 
     .voice-avatar.speaking {
-      animation: voicePulse 800ms ease-in-out infinite;
+      animation: voicePulse 750ms ease-in-out infinite;
+      border-radius: 50%;
+      outline: none;
     }
 
     /* ── Voice preview (before joining) ── */
@@ -3265,7 +3267,7 @@
 
                     <div class="changelog-entry">
             <div class="changelog-version">
-              <span class="changelog-tag">v0.50</span>
+              <span class="changelog-tag">v0.60</span>
               <span class="changelog-date">April 27, 2026</span>
             </div>
             <div class="changelog-title">Send animation</div>
@@ -5078,27 +5080,57 @@
       statusText.textContent = msg;
     }
 
-    // ── Speaking detection + mic meter ────────────────────────────────────────
-    function makeAnalyser(stream) {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const src = ctx.createMediaStreamSource(stream);
-        const an  = ctx.createAnalyser();
-        an.fftSize = 1024;  // larger: gives both good freq bins and time-domain samples
-        an.smoothingTimeConstant = 0.4;
-        src.connect(an);
-        const arr     = new Uint8Array(an.frequencyBinCount);  // frequency (256 bins)
-        const timeArr = new Uint8Array(an.fftSize);            // time domain (1024 samples)
-        return { analyser: an, dataArr: arr, timeArr, ctx };
-      } catch(e) { return null; }
+    // Shared AudioContext — browsers suspend a context that has no connected destination
+    let _sharedAudioCtx = null;
+    function getAudioCtx() {
+      if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
+        _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (_sharedAudioCtx.state === 'suspended') {
+        _sharedAudioCtx.resume().catch(() => {});
+      }
+      return _sharedAudioCtx;
     }
 
-    function isSpeaking(analyser, dataArr) {
+    function makeAnalyser(stream) {
+      try {
+        const ctx  = getAudioCtx();
+        const src  = ctx.createMediaStreamSource(stream);
+        const an   = ctx.createAnalyser();
+        an.fftSize = 1024;
+        an.smoothingTimeConstant = 0.4;
+
+        // Silent gain node — keeps the graph connected so the context stays running
+        const silence = ctx.createGain();
+        silence.gain.value = 0;
+
+        src.connect(an);
+        an.connect(silence);
+        silence.connect(ctx.destination);
+
+        const arr     = new Uint8Array(an.frequencyBinCount);
+        const timeArr = new Uint8Array(an.fftSize);
+        return { analyser: an, dataArr: arr, timeArr, ctx, src };
+      } catch(e) { console.warn('makeAnalyser failed:', e); return null; }
+    }
+
+    // Smoothed speaking averages per uid to prevent flicker
+    const speakSmooth = {};
+
+    function isSpeaking(uid, analyser, dataArr) {
       if (!analyser) return false;
       analyser.getByteFrequencyData(dataArr);
+      // Focus on speech frequencies: bins ~80Hz–3kHz (roughly indices 2–80 at 48kHz/1024)
       let sum = 0;
-      for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
-      return (sum / dataArr.length) > 6;
+      const start = 2, end = Math.min(80, dataArr.length);
+      for (let i = start; i < end; i++) sum += dataArr[i];
+      const avg = sum / (end - start);
+
+      // Exponential moving average per uid for smooth hysteresis
+      if (!speakSmooth[uid]) speakSmooth[uid] = 0;
+      speakSmooth[uid] = speakSmooth[uid] * 0.75 + avg * 0.25;
+
+      return speakSmooth[uid] > 4; // threshold: 4 = very sensitive, increase if false positives
     }
 
     // ── Mic level meter (rAF-driven, smooth) ─────────────────────────────────
@@ -5220,13 +5252,13 @@
       speakTick = setInterval(() => {
         // local speaking
         if (localAnalyser) {
-          const speaking = isSpeaking(localAnalyser.analyser, localAnalyser.dataArr);
+          const speaking = isSpeaking(myUid, localAnalyser.analyser, localAnalyser.dataArr);
           updateSpeakingUI(myUid, speaking);
         }
         // remote speaking
         Object.entries(peers).forEach(([uid, p]) => {
           if (p.analyser) {
-            const speaking = isSpeaking(p.analyser.analyser, p.analyser.dataArr);
+            const speaking = isSpeaking(uid, p.analyser.analyser, p.analyser.dataArr);
             updateSpeakingUI(uid, speaking);
           }
         });
@@ -5240,7 +5272,11 @@
     function updateSpeakingUI(uid, speaking) {
       const el = document.querySelector(`.voice-avatar[data-uid="${uid}"]`);
       if (!el) return;
-      el.classList.toggle('speaking', speaking);
+      if (speaking) {
+        el.classList.add('speaking');
+      } else {
+        el.classList.remove('speaking');
+      }
     }
 
     // ── Participant UI ────────────────────────────────────────────────────────
@@ -5362,7 +5398,7 @@
         peers[remoteUid].stream = stream;
 
         const existing = document.getElementById(`voice-audio-${remoteUid}`);
-        if (existing) existing.remove();
+        if (existing) { existing.srcObject = stream; return; }
 
         const audio = document.createElement('audio');
         audio.autoplay = true;
@@ -5370,15 +5406,19 @@
         audio.setAttribute('webkit-playsinline', '');
         audio.muted = false;
         audio.volume = 1.0;
-        audio.srcObject = stream;
         audio.id = `voice-audio-${remoteUid}`;
         document.body.appendChild(audio);
 
-        audio.play().catch(() => {
-          const unlock = () => { audio.play().catch(() => {}); };
-          document.addEventListener('click',      unlock, { once: true });
-          document.addEventListener('touchstart', unlock, { once: true });
-        });
+        // Set srcObject then attempt play — resume AudioContext first
+        audio.srcObject = stream;
+        const tryPlay = () => {
+          getAudioCtx().resume().catch(() => {});
+          audio.play().catch(() => {});
+        };
+        tryPlay();
+        // Retry on next user interaction in case autoplay was blocked
+        document.addEventListener('click',      tryPlay, { once: true });
+        document.addEventListener('touchstart', tryPlay, { once: true });
 
         const an = makeAnalyser(stream);
         if (an) peers[remoteUid].analyser = an;
@@ -5430,15 +5470,15 @@
       p.pc.close();
       delete peers[remoteUid];
       delete pendingIce[remoteUid];
+      delete speakSmooth[remoteUid];
       const audio = document.getElementById(`voice-audio-${remoteUid}`);
-      if (audio) audio.remove();
+      if (audio) { audio.srcObject = null; audio.remove(); }
     }
 
     // ── Signal listener ────────────────────────────────────────────────────────
     function listenSignals() {
       sigsUnsub = SIGS_REF()
         .where('to', '==', myUid)
-        .orderBy('ts', 'asc')
         .onSnapshot(snap => {
           snap.docChanges().forEach(change => {
             if (change.type !== 'added') return;
@@ -5526,9 +5566,19 @@
           if (!parts[uid]) closePeer(uid);
         });
 
-        // NOTE: We do NOT create peers here. Peer creation is triggered
-        // by incoming signals (offers) in listenSignals / processSignal.
-        // Creating peers here races with signaling and causes duplicate connections.
+        // Connect to new participants who joined after us.
+        // We only initiate as the impolite (lower UID) peer — the polite peer
+        // waits to receive the offer. This avoids duplicate connections.
+        Object.keys(parts).forEach(uid => {
+          if (uid === myUid) return;
+          if (peers[uid]) return; // already connected
+          const polite = myUid > uid; // higher UID is polite (waits for offer)
+          if (!polite) {
+            // We are impolite → we send the offer
+            createPeer(uid, false).catch(e => console.warn('peer creation error:', e));
+          }
+          // Polite peer doesn't initiate — it waits for the offer via listenSignals
+        });
       }, err => console.warn('room listener error:', err));
     }
 
@@ -5596,6 +5646,8 @@
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      // Ensure AudioContext is running (browsers may auto-suspend it)
+      getAudioCtx().resume().catch(() => {});
       } catch(e) {
         setStatus('Microphone access denied.');
         console.error(e);
