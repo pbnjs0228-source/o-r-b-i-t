@@ -125,24 +125,24 @@
     }
 
     body.theme-purple {
-      --bg-body: #f3e8ff;
-      --bg-surface: #ffffff;
-      --bg-subtle: #f5f3ff;
-      --border-subtle: #e9d5ff;
-      --border-strong: #c4b5fd;
-      --text-main: #111827;
-      --text-muted: #4b5563;
-      --text-soft: #6b7280;
-      --accent: #7c3aed;
-      --accent-soft: #ede9fe;
+      --bg-body: #0d0520;
+      --bg-surface: #110828;
+      --bg-subtle: #160b30;
+      --border-subtle: #2a1254;
+      --border-strong: #3d1a7a;
+      --text-main: #e8d5ff;
+      --text-muted: #b08ad8;
+      --text-soft: #7a52a8;
+      --accent: #a855f7;
+      --accent-soft: #2d1260;
       --accent-contrast: #ffffff;
-      --shadow-soft: 0 10px 30px rgba(76, 29, 149, 0.18);
-      --shadow-modal: 0 18px 40px rgba(76, 29, 149, 0.25);
-      --input-bg: #ffffff;
-      --input-border-focus: #a855f7;
-      --badge-bg: #f3e8ff;
-      --badge-border: #e9d5ff;
-      --danger: #b91c1c;
+      --shadow-soft: 0 10px 30px rgba(80, 0, 180, 0.5);
+      --shadow-modal: 0 18px 40px rgba(80, 0, 180, 0.65);
+      --input-bg: #110828;
+      --input-border-focus: #c084fc;
+      --badge-bg: #160b30;
+      --badge-border: #2a1254;
+      --danger: #f87171;
       --admin-badge-bg: #f97316;
       --admin-badge-text: #ffffff;
     }
@@ -515,8 +515,8 @@
     }
 
     body.theme-purple .message-bubble {
-      background: #f3e8ff;
-      color: #111827;
+      background: #1e0e40;
+      color: #e8d5ff;
     }
 
     body.theme-red .message-bubble {
@@ -796,6 +796,10 @@
       background: #111827;
     }
 
+    body.theme-purple .btn:hover:not(:disabled) {
+      background: #1e0e40;
+    }
+
     body.theme-blue .btn:hover:not(:disabled) {
       background: #0c1630;
     }
@@ -848,6 +852,12 @@
       background: #020617;
       color: #e5e7eb;
       border-color: #111827;
+    }
+
+    body.theme-purple .theme-select {
+      background: #110828;
+      color: #e8d5ff;
+      border-color: #2a1254;
     }
 
     body.theme-blue .theme-select {
@@ -945,6 +955,10 @@
 
     body.theme-dark .modal-tabs {
       background: #020617;
+    }
+
+    body.theme-purple .modal-tabs {
+      background: #0d0520;
     }
 
     body.theme-blue .modal-tabs {
@@ -1429,7 +1443,8 @@
 
       .app {
         width: 100%;
-        height: 100svh; /* visual viewport height, respects keyboard */
+        height: 100svh;
+        height: 100dvh; /* dynamic viewport - adjusts when keyboard appears */
         border-radius: 0;
         box-shadow: none;
         display: flex;
@@ -1495,9 +1510,38 @@
       /* ── Sidebar: collapsed horizontal strip ── */
       .sidebar-column {
         order: -1;
-        max-height: 52px;
         flex-shrink: 0;
         border-bottom: 1px solid var(--border-subtle);
+        /* Allow column to grow for voice card content */
+        max-height: none;
+        overflow: hidden;
+      }
+
+      /* Members card: horizontal scrolling strip */
+      .sidebar-card:not(.voice-card) {
+        border: none;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 5px 10px;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+        max-height: 48px;
+      }
+
+      /* Voice card: normal vertical layout on mobile, compact */
+      .voice-card {
+        border: none;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 6px 10px;
+        flex-direction: column;
+        max-height: none;
+      }
+
+      .voice-card .sidebar-body {
+        flex-direction: column;
+        overflow: visible;
+        padding: 0;
       }
 
       .sidebar-card {
@@ -1510,6 +1554,13 @@
         overflow: hidden;
       }
 
+      .sidebar-card:not(.voice-card) .sidebar-header {
+        border-bottom: none;
+        padding-bottom: 0;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+
       .sidebar-header {
         border-bottom: none;
         padding-bottom: 0;
@@ -1517,7 +1568,7 @@
         white-space: nowrap;
       }
 
-      .sidebar-body {
+      .sidebar-card:not(.voice-card) .sidebar-body {
         flex-direction: row;
         flex-wrap: nowrap;
         margin-top: 0;
@@ -1527,7 +1578,7 @@
         /* Hide scrollbar but keep scroll */
         scrollbar-width: none;
       }
-      .sidebar-body::-webkit-scrollbar { display: none; }
+      .sidebar-card:not(.voice-card) .sidebar-body::-webkit-scrollbar { display: none; }
 
       /* Member rows go horizontal, just show avatar + name */
       .member-row {
@@ -1943,10 +1994,10 @@
         radial-gradient(circle at 67% 44%, var(--star-bright) 0 1.3px, rgba(0,0,0,0.03) 1.8px, transparent 3.5px),
         radial-gradient(circle at 88% 91%, var(--star-bright) 0 1.6px, rgba(0,0,0,0.04) 2.2px, transparent 4.5px),
         radial-gradient(circle at 49% 93%, var(--star-bright) 0 1.2px, rgba(0,0,0,0.03) 1.7px, transparent 3px),
-        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(100, 40, 200, 0.12), transparent),
-        radial-gradient(circle at top, rgba(120, 60, 255, 0.25), transparent 32%),
-        radial-gradient(circle at 22% 18%, rgba(200, 100, 255, 0.18), transparent 22%),
-        radial-gradient(circle at 75% 80%, rgba(80, 40, 180, 0.12), transparent 20%),
+        radial-gradient(ellipse 70% 25% at 40% 55%, rgba(120, 40, 200, 0.14), transparent),
+        radial-gradient(circle at top, rgba(100, 50, 220, 0.28), transparent 32%),
+        radial-gradient(circle at 22% 18%, rgba(160, 80, 255, 0.18), transparent 22%),
+        radial-gradient(circle at 75% 80%, rgba(80, 30, 180, 0.14), transparent 20%),
         linear-gradient(160deg, #0d0520 0%, #160838 40%, #0a0318 70%, #080412 100%);
       background-size:
         190px 190px, 320px 320px, 260px 260px, 470px 470px, 380px 380px,
@@ -2151,10 +2202,14 @@
         linear-gradient(135deg, rgba(18, 22, 42, 0.95), rgba(8, 11, 24, 0.88));
     }
 
-    body.theme-light .channel-header,
-    body.theme-purple .channel-header {
+    body.theme-light .channel-header {
       background:
         linear-gradient(135deg, color-mix(in srgb, var(--bg-subtle) 86%, white), color-mix(in srgb, var(--accent-soft) 45%, white));
+    }
+
+    body.theme-purple .channel-header {
+      background: linear-gradient(135deg, rgba(20, 6, 48, 0.97), rgba(30, 10, 70, 0.90));
+      border-color: #2a1254;
     }
 
     body.theme-blue .channel-header {
@@ -2674,6 +2729,74 @@
     .voice-avatar.speaking {
       animation: voicePulse 800ms ease-in-out infinite;
     }
+
+    /* ── Voice preview (before joining) ── */
+    .voice-preview-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .voice-preview-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 2px 4px;
+    }
+
+    .voice-preview-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-main);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .voice-preview-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    /* ── Kick button in voice participant row ── */
+    .voice-kick-btn {
+      margin-left: auto;
+      background: transparent;
+      border: none;
+      color: var(--text-soft);
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 6px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transition: background 120ms, color 120ms;
+      flex-shrink: 0;
+    }
+
+    .voice-kick-btn:hover {
+      background: rgba(239,68,68,0.12);
+      color: #ef4444;
+    }
+
+    /* Mobile: voice card gets enough height to show content */
+    @media (max-width: 640px) {
+      .voice-card {
+        flex-shrink: 0;
+        max-height: none;
+      }
+    }
   </style>
 </head>
 <body class="theme-dark">
@@ -2799,8 +2922,14 @@
         <div class="sidebar-card voice-card">
           <div class="sidebar-header">
             <span class="sidebar-title">🎙 Voice</span>
+            <span class="voice-count-badge" id="voiceCountBadge" style="display:none;font-size:11px;color:var(--text-muted);"></span>
           </div>
           <div class="sidebar-body" style="padding:8px;">
+            <!-- Preview: who's in VC (visible before joining) -->
+            <div class="voice-preview-panel" id="voicePreviewPanel" style="display:none; margin-bottom:6px;">
+              <div class="voice-preview-label" style="font-size:11px;color:var(--text-soft);margin-bottom:4px;">Currently in voice:</div>
+              <div class="voice-preview-list" id="voicePreviewList"></div>
+            </div>
             <button class="voice-join-btn" id="voiceJoinBtn" type="button">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -3169,6 +3298,8 @@
 
     let currentUser = null;
     let currentProfile = { displayName: null, photoData: null, isAdmin: false, timeoutUntil: null };
+    // Expose for voice chat script to check admin
+    Object.defineProperty(window, '_currentProfile', { get: () => currentProfile });
     let unsubscribeMessages = null;
     let unsubscribeMembers = null;
     let authMode = "signin";
@@ -4758,6 +4889,8 @@
     const peers        = {};
     let roomUnsub      = null;
     let sigsUnsub      = null;
+    let kickUnsub      = null;
+    let previewUnsub   = null;
 
     // Speaking detection
     const speakMap     = {};   // uid -> bool
@@ -4772,6 +4905,9 @@
     const muteBtn      = document.getElementById('voiceMuteBtn');
     const leaveBtn     = document.getElementById('voiceLeaveBtn');
     const statusText   = document.getElementById('voiceStatusText');
+    const previewPanel = document.getElementById('voicePreviewPanel');
+    const previewList  = document.getElementById('voicePreviewList');
+    const countBadge   = document.getElementById('voiceCountBadge');
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     // Cached after Firestore fetch on join — avoids cross-script let scoping issues
@@ -4858,6 +4994,13 @@
     function renderParticipants(roomData) {
       const parts = roomData.participants || {};
       participants.innerHTML = '';
+      const isAdmin = (() => {
+        try {
+          const u = auth.currentUser;
+          return u && window._currentProfile && window._currentProfile.isAdmin;
+        } catch(e) { return false; }
+      })();
+
       Object.entries(parts).forEach(([uid, info]) => {
         const isSelf = uid === myUid;
         const name   = info.displayName || 'User';
@@ -4870,8 +5013,35 @@
           <div class="voice-avatar" data-uid="${uid}">${avatarHTML(name, photo)}</div>
           <span class="voice-participant-name">${name}${isSelf ? ' (you)' : ''}</span>
           <span class="voice-participant-muted">🔇</span>
+          ${isAdmin && !isSelf ? `<button class="voice-kick-btn" data-uid="${uid}" data-name="${name}" title="Kick from voice">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Kick
+          </button>` : ''}
         `;
         participants.appendChild(row);
+      });
+
+      // Wire kick buttons
+      participants.querySelectorAll('.voice-kick-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const uid = btn.dataset.uid;
+          const name = btn.dataset.name;
+          if (!confirm(`Kick ${name} from voice chat?`)) return;
+          try {
+            await ROOM_REF().update({
+              [`participants.${uid}`]: firebase.firestore.FieldValue.delete()
+            });
+            // Write a kick signal so their client auto-leaves
+            await ROOM_REF().collection('kicks').doc(uid).set({
+              kickedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              kickedBy: myUid
+            });
+          } catch(e) { console.error('kick error', e); }
+        });
       });
 
       const count = Object.keys(parts).length;
@@ -4933,12 +5103,33 @@
         const stream = streams[0];
         peers[remoteUid].stream = stream;
 
+        // Remove any existing audio element first
+        const existing = document.getElementById(`voice-audio-${remoteUid}`);
+        if (existing) existing.remove();
+
         const audio = document.createElement('audio');
         audio.autoplay = true;
         audio.setAttribute('playsinline', '');
+        audio.setAttribute('webkit-playsinline', '');
+        audio.muted = false;
         audio.srcObject = stream;
         audio.id = `voice-audio-${remoteUid}`;
         document.body.appendChild(audio);
+
+        // iOS requires a user gesture to play — try playing and handle the promise
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Auto-play blocked; wait for next user interaction
+            const unlockAudio = () => {
+              audio.play().catch(() => {});
+              document.removeEventListener('touchstart', unlockAudio);
+              document.removeEventListener('click', unlockAudio);
+            };
+            document.addEventListener('touchstart', unlockAudio, { once: true });
+            document.addEventListener('click', unlockAudio, { once: true });
+          });
+        }
 
         const an = makeAnalyser(stream);
         if (an) peers[remoteUid].analyser = an;
@@ -5049,6 +5240,52 @@
       }, err => console.error('room error', err));
     }
 
+    // ── Preview: show who's in VC before joining ───────────────────────────────
+    function listenPreview() {
+      previewUnsub = ROOM_REF().onSnapshot(snap => {
+        if (inVoice) return; // don't update preview while inside
+        const parts = snap.exists ? (snap.data().participants || {}) : {};
+        const count = Object.keys(parts).length;
+
+        if (count === 0) {
+          previewPanel.style.display = 'none';
+          countBadge.style.display = 'none';
+        } else {
+          previewPanel.style.display = 'block';
+          countBadge.style.display = 'inline';
+          countBadge.textContent = `${count} in voice`;
+          previewList.innerHTML = '';
+          Object.entries(parts).forEach(([uid, info]) => {
+            const name  = info.displayName || 'User';
+            const photo = info.photoData   || null;
+            const item = document.createElement('div');
+            item.className = 'voice-preview-item';
+            item.innerHTML = `
+              <div class="voice-preview-avatar">${photo ? `<img src="${photo}" alt="${name}" />` : initials(name)}</div>
+              <span>${name}</span>
+              ${info.muted ? '<span style="font-size:10px;opacity:0.6;">🔇</span>' : ''}
+            `;
+            previewList.appendChild(item);
+          });
+        }
+      }, () => {});
+    }
+
+    // ── Kick listener: auto-leave if admin kicked us ───────────────────────────
+    function listenKicks() {
+      if (!myUid) return;
+      kickUnsub = ROOM_REF().collection('kicks').doc(myUid)
+        .onSnapshot(snap => {
+          if (!snap.exists) return;
+          // Clean up the kick doc so it doesn't trigger again
+          snap.ref.delete().catch(() => {});
+          if (inVoice) {
+            setStatus('You were removed from voice.');
+            leaveVoice();
+          }
+        }, () => {});
+    }
+
     // ── Join / Leave ──────────────────────────────────────────────────────────
     async function joinVoice() {
       const user = auth.currentUser;   // use Firebase SDK directly — always reliable
@@ -5091,7 +5328,11 @@
       await joinRoomDoc();
       listenRoom();
       listenSignals();
+      listenKicks();
       startSpeakLoop();
+      // Hide preview panel while in voice
+      previewPanel.style.display = 'none';
+      countBadge.style.display = 'none';
       setStatus('You joined voice.');
     }
 
@@ -5103,6 +5344,7 @@
 
       if (sigsUnsub) { sigsUnsub(); sigsUnsub = null; }
       if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+      if (kickUnsub) { kickUnsub(); kickUnsub = null; }
 
       Object.keys(peers).forEach(uid => closePeer(uid));
 
@@ -5176,6 +5418,10 @@
     });
     muteBtn.addEventListener('click', toggleMute);
     leaveBtn.addEventListener('click', leaveVoice);
+
+    // ── Start preview listener (shows who's in VC before you join) ────────────
+    // Wait a tick so Firebase is initialised by the main script
+    setTimeout(() => { try { listenPreview(); } catch(e) {} }, 1200);
   })();
   </script>
 </body>
