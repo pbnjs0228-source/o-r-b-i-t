@@ -4203,7 +4203,8 @@
       renderedIds.clear();
       oldestCursor = null;
       firstLoadDone = false;
-      loadOlderBtn.classList.remove('visible');
+      const _lob = document.getElementById('loadOlderBtn');
+      if (_lob) _lob.classList.remove('visible');
       emptyStateEl.style.display = "none";
       membersList.innerHTML = "";
       memberCountLabel.textContent = "0";
@@ -4222,9 +4223,6 @@
     function smoothScrollMessagesToBottom() {
       messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
     }
-
-    // Load-older button (manual fallback for the sentinel)
-    loadOlderBtn.addEventListener('click', loadOlderMessages);
 
     function openAdminModal() {
       if (!currentUser || !currentProfile.isAdmin) return;
@@ -4415,6 +4413,9 @@
     const chatSkeleton    = document.getElementById('chatSkeleton');
     const loadOlderBtn    = document.getElementById('loadOlderBtn');
     const loadOlderSent   = document.getElementById('loadOlderSentinel');
+
+    // Wire load-older button (manual fallback for the sentinel observer)
+    loadOlderBtn.addEventListener('click', loadOlderMessages);
 
     // ── Build a real DOM row for one doc ─────────────────────────────────────
     function buildMessageRow(doc) {
