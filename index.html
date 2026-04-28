@@ -3362,7 +3362,7 @@
        SCREENSHARE
        ══════════════════════════════════════════ */
 
-    /* "View screen" button on participant row */
+    /* "VIEW STREAM" button on participant row */
     .voice-screen-btn {
       display: none;
       align-items: center;
@@ -3472,6 +3472,27 @@
       background: #000;
       object-fit: contain;
       box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    }
+
+    .screen-viewer-waiting {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      padding: 40px 20px;
+    }
+
+    .screen-viewer-waiting.visible { display: flex; }
+
+    .screen-viewer-wait-spinner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: rgba(255,255,255,0.8);
+      animation: voiceSpin 0.8s linear infinite;
     }
 
     .screen-viewer-loading {
@@ -3880,7 +3901,12 @@
       </div>
       <button class="screen-viewer-close" id="screenViewerClose" title="Close">×</button>
     </div>
-    <div class="screen-viewer-loading" id="screenViewerLoading">Waiting for stream…</div>
+    <div class="screen-viewer-waiting" id="screenViewerWaiting">
+      <div class="screen-viewer-wait-spinner"></div>
+      <span>Waiting for stream to arrive…</span>
+      <span style="font-size:11px;opacity:0.5;">WebRTC is connecting — usually takes a few seconds</span>
+    </div>
+    <div class="screen-viewer-loading" id="screenViewerLoading">Buffering…</div>
     <video class="screen-viewer-video" id="screenViewerVideo" autoplay playsinline muted></video>
   </div>
 
@@ -6355,17 +6381,21 @@
     const voiceLoadingDesc    = document.getElementById('voiceLoadingDesc');
 
     // Screen viewer DOM refs
-    const screenViewerBackdrop = document.getElementById('screenViewerBackdrop');
-    const screenViewerVideo    = document.getElementById('screenViewerVideo');
-    const screenViewerClose    = document.getElementById('screenViewerClose');
-    const screenViewerLabel    = document.getElementById('screenViewerLabel');
-    const screenViewerLoading  = document.getElementById('screenViewerLoading');
+    const screenViewerBackdrop  = document.getElementById('screenViewerBackdrop');
+    const screenViewerVideo     = document.getElementById('screenViewerVideo');
+    const screenViewerClose     = document.getElementById('screenViewerClose');
+    const screenViewerLabel     = document.getElementById('screenViewerLabel');
+    const screenViewerLoading   = document.getElementById('screenViewerLoading');
+    const screenViewerWaiting   = document.getElementById('screenViewerWaiting');
 
     // ── Screenshare state ─────────────────────────────────────────────────────
-    let screenStream    = null;  // our own screen MediaStream
-    let isSharing       = false; // are WE currently sharing?
-    // Map of remote uid → their video track (received via ontrack)
-    const remoteScreenTracks = {}; // uid → MediaStreamTrack
+    let screenStream    = null;   // our own screen MediaStream
+    let isSharing       = false;  // are WE currently sharing?
+    // Full MediaStream from each remote peer's ontrack event (video tracks)
+    // Storing the full stream (not just track) is critical — MediaStream created
+    // from a detached track has no guarantee of playability on all browsers.
+    const remoteScreenStreams = {}; // uid → MediaStream
+    let _viewingUid = null; // uid whose stream is open in the viewer (or "waiting")
 
     function showVoiceLoading(title, desc) {
       if (!voiceLoadingOverlay) return;
@@ -6560,7 +6590,10 @@
         const name      = info.displayName || 'User';
         const photo     = info.photoData   || null;
         const muted     = info.muted       || false;
-        const hasScreen = !isSelf && !!remoteScreenTracks[uid]; // they have a live screen track
+        // Show VIEW STREAM if: they have a Firestore isSharing flag OR we have their stream track already
+        const firestoreSharing = !isSelf && !!info.isSharing;
+        const streamReady      = !isSelf && !!remoteScreenStreams[uid];
+        const hasScreen        = firestoreSharing || streamReady;
 
         const row = document.createElement('div');
         row.className = 'voice-participant' + (muted ? ' muted' : '') + (isSelf && isSharing ? ' sharing' : '');
@@ -6584,13 +6617,15 @@
         mi.textContent = '🔇';
         row.appendChild(mi);
 
-        // "View screen" button — only shown when that peer is sharing
+        // VIEW STREAM button — shown whenever the remote peer is sharing (Firestore flag)
+        // even before the WebRTC stream has arrived. Clicking opens the viewer which
+        // shows a "waiting" spinner until the stream arrives via ontrack.
         if (hasScreen) {
           const viewBtn = document.createElement('button');
           viewBtn.className = 'voice-screen-btn visible';
           viewBtn.type = 'button';
-          viewBtn.title = `View ${name}'s screen`;
-          viewBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> View screen`;
+          viewBtn.title = streamReady ? `View ${name}'s screen` : `Stream connecting…`;
+          viewBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> VIEW STREAM`;
           viewBtn.addEventListener('click', () => openScreenViewer(uid, name));
           row.appendChild(viewBtn);
         }
@@ -6679,14 +6714,26 @@
 
       pc.ontrack = ({ track, streams }) => {
         if (track.kind === 'video') {
-          // This is a screenshare track from the remote peer
-          remoteScreenTracks[remoteUid] = track;
+          // Store the FULL MediaStream (not just the track).
+          // streams[0] is the MediaStream the remote peer sent — use it directly.
+          // Fallback: if streams is empty, build one from the track (less reliable).
+          const screenStream = streams?.[0] || new MediaStream([track]);
+          remoteScreenStreams[remoteUid] = screenStream;
+
+          // When the sharer stops, clean up and close viewer if open
           track.onended = () => {
-            delete remoteScreenTracks[remoteUid];
-            // If we're viewing their screen, close the viewer
-            if (screenViewerVideo.dataset.viewingUid === remoteUid) closeScreenViewer();
+            delete remoteScreenStreams[remoteUid];
+            // Also clear the Firestore sharing flag if relevant
+            if (_viewingUid === remoteUid) closeScreenViewer();
             renderParticipantsFromCache();
           };
+
+          // If the viewer modal is already open waiting for this uid's stream,
+          // connect the stream immediately without making the user click again.
+          if (_viewingUid === remoteUid) {
+            _connectStreamToViewer(remoteUid);
+          }
+
           renderParticipantsFromCache();
           return;
         }
@@ -7052,9 +7099,13 @@
       localAnalyser = null;
 
       // Stop screenshare if active
-      if (isSharing) stopScreenShare();
+      if (isSharing) {
+        stopScreenShare();
+        // stopScreenShare already clears Firestore flag via leaveRoomDoc below,
+        // but leaveRoomDoc deletes the entire participant entry, so no extra call needed.
+      }
       // Clear remote screen tracks
-      Object.keys(remoteScreenTracks).forEach(k => delete remoteScreenTracks[k]);
+      Object.keys(remoteScreenStreams).forEach(k => delete remoteScreenStreams[k]);
       closeScreenViewer();
 
       if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
@@ -7127,6 +7178,10 @@
       // When the user stops sharing via the browser's built-in UI
       videoTrack.onended = () => stopScreenShare();
 
+      // Write isSharing=true to Firestore so all room participants can show the button
+      // immediately, even before WebRTC renegotiation delivers the track to them.
+      ROOM_REF().update({ [`participants.${myUid}.isSharing`]: true }).catch(() => {});
+
       // Update UI
       shareBtn.classList.add('sharing-active');
       shareBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Stop`;
@@ -7154,6 +7209,12 @@
         delete peers._screenSenders;
       }
 
+      // Clear Firestore isSharing flag — button disappears for all viewers
+      ROOM_REF().update({ [`participants.${myUid}.isSharing`]: firebase.firestore.FieldValue.delete() }).catch(() => {});
+
+      // If anyone is currently viewing our screen, their viewer will auto-close
+      // when the track.onended fires on their side. Nothing to do here.
+
       // Update UI
       shareBtn.classList.remove('sharing-active');
       shareBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Share`;
@@ -7166,33 +7227,75 @@
     }
 
     // ── Screen viewer ─────────────────────────────────────────────────────────
-    function openScreenViewer(uid, name) {
-      const track = remoteScreenTracks[uid];
-      if (!track) return;
+    // Internal: feed a stream into the video element once it's available.
+    // Called from openScreenViewer() AND from ontrack when viewer is already open.
+    function _connectStreamToViewer(uid) {
+      const stream = remoteScreenStreams[uid];
+      if (!stream) return; // stream not arrived yet — stay on waiting spinner
 
-      screenViewerLabel.textContent = `${name}'s screen`;
-      screenViewerVideo.dataset.viewingUid = uid;
-
-      // Build a MediaStream from the track to feed into the video element
-      const ms = new MediaStream([track]);
-      screenViewerVideo.srcObject = ms;
+      screenViewerWaiting.classList.remove('visible');
       screenViewerLoading.style.display = 'block';
+      screenViewerVideo.style.display = 'block';
+      screenViewerVideo.srcObject = stream;
+
+      // Clear old handlers
+      screenViewerVideo.oncanplay  = null;
+      screenViewerVideo.onerror    = null;
 
       screenViewerVideo.oncanplay = () => {
         screenViewerLoading.style.display = 'none';
       };
 
-      screenViewerVideo.play().catch(() => {});
+      screenViewerVideo.onerror = () => {
+        screenViewerLoading.style.display = 'none';
+        screenViewerWaiting.classList.add('visible');
+        screenViewerVideo.style.display = 'none';
+      };
 
+      // play() must be called — autoplay alone isn't enough on all browsers
+      screenViewerVideo.play().catch(err => {
+        console.warn('[screen] viewer play() blocked:', err);
+        // Retry on next user interaction
+        const retry = () => screenViewerVideo.play().catch(() => {});
+        document.addEventListener('click',      retry, { once: true });
+        document.addEventListener('touchstart', retry, { once: true });
+      });
+    }
+
+    function openScreenViewer(uid, name) {
+      _viewingUid = uid;
+
+      screenViewerLabel.textContent = `${name}'s screen`;
       screenViewerBackdrop.classList.add('visible');
       document.body.style.overflow = 'hidden';
+
+      const stream = remoteScreenStreams[uid];
+
+      if (stream) {
+        // Stream already received via ontrack — connect immediately
+        screenViewerWaiting.classList.remove('visible');
+        screenViewerVideo.style.display = 'block';
+        _connectStreamToViewer(uid);
+      } else {
+        // Stream not yet arrived (WebRTC renegotiating) — show waiting spinner.
+        // ontrack will call _connectStreamToViewer() when it arrives.
+        screenViewerWaiting.classList.add('visible');
+        screenViewerLoading.style.display = 'none';
+        screenViewerVideo.style.display = 'none';
+        screenViewerVideo.srcObject = null;
+      }
     }
 
     function closeScreenViewer() {
+      _viewingUid = null;
       screenViewerBackdrop.classList.remove('visible');
       document.body.style.overflow = '';
-      screenViewerVideo.srcObject = null;
-      screenViewerVideo.dataset.viewingUid = '';
+      screenViewerVideo.srcObject    = null;
+      screenViewerVideo.oncanplay    = null;
+      screenViewerVideo.onerror      = null;
+      screenViewerVideo.style.display = 'block';
+      screenViewerWaiting.classList.remove('visible');
+      screenViewerLoading.style.display = 'none';
     }
 
     screenViewerClose.addEventListener('click', closeScreenViewer);
