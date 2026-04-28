@@ -3760,11 +3760,11 @@
 
           <div class="changelog-entry">
             <div class="changelog-version">
-              <span class="changelog-tag">v1.x</span>
-              <span class="changelog-date">Month YYYY</span>
+              <span class="changelog-tag" style="background:linear-gradient(135deg,#ff8a3d,#ffca69,#8aa9ff,#5b4bff);color:#050712;">v1.0</span>
+              <span class="changelog-date">April 28, 2026</span>
             </div>
-            <div class="changelog-title">Short headline</div>
-            <div class="changelog-notes">Description of what changed.</div>
+            <div class="changelog-title">🎉 v1.0 Release</div>
+            <div class="changelog-notes">ORBIT is officially 1.0! This release brings replies (tap ↩ on any message), @mention autocomplete with highlighting, image lightboxes (click any image to enlarge), voice chat improvements with reliable peer-to-peer audio and green speaking indicators, full mobile support, and dark Nebula Blue & Hydrogen Red themes.</div>
           </div>
 
                ════════════════════════════════════════════ -->
@@ -4455,6 +4455,8 @@
     let oldestCursor    = null;
     let loadingOlder    = false;
     let firstLoadDone   = false;
+    // set true right after WE send — guarantees scroll to bottom on next snapshot
+    let pendingSelfScroll = false;
 
     const chatSkeleton    = document.getElementById('chatSkeleton');
     const loadOlderBtn    = document.getElementById('loadOlderBtn');
@@ -4651,8 +4653,12 @@
       }
       emptyStateEl.style.display = "none";
 
-      // Snapshot scroll position BEFORE any DOM mutation
-      const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+      // Snapshot scroll position BEFORE any DOM mutation.
+      // Also force scroll-to-bottom if WE just sent a message.
+      const forceScroll = pendingSelfScroll;
+      pendingSelfScroll = false;
+      const wasAtBottom = forceScroll ||
+        (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80);
 
       // Build keyed map of currently live nodes (id → element)
       const liveNodes = new Map();
@@ -4774,10 +4780,11 @@
       });
 
       // Restore/set scroll
-      if (scrollToBottomAfter) {
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      } else if (!wasAtBottom) {
-        // Nothing to do — in-place diff preserves scrollTop automatically
+      if (scrollToBottomAfter || wasAtBottom) {
+        // rAF ensures we measure scrollHeight AFTER the browser has painted the new nodes
+        requestAnimationFrame(() => {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        });
       }
     }
 
@@ -4893,7 +4900,10 @@
 
         if (newAdded && !needsFullReconcile) {
           // Fast path: just append new messages at the bottom, no full reconcile
-          const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+          const forceScroll = pendingSelfScroll;
+          pendingSelfScroll = false;
+          const atBottom = forceScroll ||
+            (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80);
           // Find docs that were just added (not yet in DOM)
           const newDocs = allDocs.filter(d => !messagesEl.querySelector(`[data-message-id="${d.id}"]`));
           newDocs.forEach((doc, offset) => {
@@ -4910,7 +4920,7 @@
             renderedIds.add(doc.id);
             messagesEl.appendChild(row);
           });
-          if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+          if (atBottom) requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
           initUpgradeObserver();
           return;
         }
@@ -5335,6 +5345,7 @@
       resetAttachment();
       cancelReply();
       closeMentionDropdown();
+      pendingSelfScroll = true; // guarantee scroll-to-bottom on next snapshot
 
       try {
         await db.collection("messages").add({
@@ -5804,7 +5815,7 @@
     // ─────────────────────────────────────────
     // IMPORTANT: bump CHANGELOG_VERSION whenever you add a new entry.
     // The modal will automatically reappear for all users on their next visit.
-    const CHANGELOG_VERSION = "1.3";
+    const CHANGELOG_VERSION = "1.0-release";
     const CHANGELOG_SEEN_KEY = "orbit_changelog_seen";
 
     function changelogAlreadySeen() {
@@ -5823,11 +5834,56 @@
       else btn.classList.remove("has-update");
     }
 
+    // ── Confetti burst ────────────────────────────────────────────────────────
+    function launchConfetti() {
+      const canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99999;';
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      document.body.appendChild(canvas);
+      const ctx = canvas.getContext('2d');
+      const COLORS = ['#ff8a3d','#ffca69','#8aa9ff','#5b4bff','#f472b6','#34d399','#fbbf24','#60a5fa','#a78bfa'];
+      const pieces = Array.from({ length: 140 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * -0.5 - 10,
+        r: Math.random() * 7 + 4,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        rot: Math.random() * Math.PI * 2,
+        vx: (Math.random() - 0.5) * 5,
+        vy: Math.random() * 3 + 2,
+        vr: (Math.random() - 0.5) * 0.2,
+        shape: Math.random() > 0.5 ? 'rect' : 'circle',
+        alpha: 1,
+      }));
+      let frame = 0;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach(p => {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.rot += p.vr;
+          if (frame > 80) p.alpha -= 0.018;
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          if (p.shape === 'rect') { ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r); }
+          else { ctx.beginPath(); ctx.arc(0, 0, p.r * 0.6, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+        });
+        ctx.globalAlpha = 1;
+        frame++;
+        if (frame < 160 && pieces.some(p => p.alpha > 0)) requestAnimationFrame(draw);
+        else canvas.remove();
+      }
+      requestAnimationFrame(draw);
+    }
+
     function openChangelog() {
       changelogModalBackdrop.style.display = "flex";
       requestAnimationFrame(() => changelogModalBackdrop.classList.add("visible"));
       markChangelogSeen();
       setChangelogBadge(false);
+
+      // 🎉 Confetti every time the changelog opens
+      launchConfetti();
 
       // 5-second countdown before "Got it" is enabled
       const closeBtn = document.getElementById("changelogModalCloseBtn");
