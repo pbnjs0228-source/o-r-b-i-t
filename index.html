@@ -2406,8 +2406,155 @@
       #attachBtn { padding: 6px 10px; min-width: 40px; min-height: 40px; justify-content: center; }
     }
 
-    /* ── Global touch polish ── */
-    button, select, textarea, input, .modal-tab, .member-row, .app-user {
+    /* ══════════════════════════════════════════
+       CHAT LOADING SKELETON
+       ══════════════════════════════════════════ */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+
+    .skeleton-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 12px 8px;
+      pointer-events: none;
+    }
+
+    .skeleton-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .skeleton-row.self {
+      flex-direction: row-reverse;
+    }
+
+    .skeleton-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: linear-gradient(90deg, var(--border-subtle) 25%, var(--bg-subtle) 50%, var(--border-subtle) 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+
+    .skeleton-bubble {
+      border-radius: var(--radius-md);
+      background: linear-gradient(90deg, var(--border-subtle) 25%, var(--bg-subtle) 50%, var(--border-subtle) 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+
+    /* ══════════════════════════════════════════
+       VIRTUAL SCROLL PLACEHOLDERS
+       ══════════════════════════════════════════ */
+    .msg-placeholder {
+      /* height set dynamically via JS to preserve scroll position */
+      flex-shrink: 0;
+      background: transparent;
+    }
+
+    /* Load-older sentinel at the very top */
+    .load-older-sentinel {
+      height: 1px;
+      flex-shrink: 0;
+    }
+
+    .load-older-btn {
+      align-self: center;
+      background: var(--accent-soft);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 14px;
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+      margin: 4px 0;
+      display: none;
+    }
+    .load-older-btn.visible { display: block; }
+    .load-older-btn:hover { background: var(--border-subtle); color: var(--text-main); }
+
+    /* ══════════════════════════════════════════
+       VOICE LOADING OVERLAY
+       ══════════════════════════════════════════ */
+    .voice-loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-surface);
+      border-radius: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .voice-loading-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .voice-loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .voice-loading-step {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 0 12px;
+    }
+
+    .voice-loading-step strong {
+      display: block;
+      color: var(--text-main);
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    /* Per-participant connection state badge */
+    .voice-peer-state {
+      font-size: 10px;
+      color: var(--text-soft);
+      margin-left: auto;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .voice-peer-state::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-soft);
+      display: inline-block;
+    }
+
+    .voice-peer-state.connecting::before { background: #f59e0b; }
+    .voice-peer-state.connected::before  { background: #22c55e; }
+    .voice-peer-state.failed::before     { background: #ef4444; }
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation; /* removes 300ms tap delay */
     }
@@ -3222,7 +3369,20 @@
           <div class="channel-meta" id="presenceLabel"></div>
         </section>
 
-        <section class="messages" id="messages"></section>
+        <section class="messages" id="messages">
+          <!-- load-older sentinel: IntersectionObserver watches this -->
+          <div class="load-older-sentinel" id="loadOlderSentinel"></div>
+          <button class="load-older-btn" id="loadOlderBtn" type="button">⬆ Load older messages</button>
+          <!-- chat skeleton shown while first load -->
+          <div class="skeleton-wrap" id="chatSkeleton">
+            <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:180px;height:38px;"></div></div>
+            <div class="skeleton-row self"><div class="skeleton-bubble" style="width:140px;height:28px;"></div></div>
+            <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:220px;height:48px;"></div></div>
+            <div class="skeleton-row self"><div class="skeleton-bubble" style="width:160px;height:28px;"></div></div>
+            <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:200px;height:60px;"></div></div>
+            <div class="skeleton-row self"><div class="skeleton-bubble" style="width:120px;height:28px;"></div></div>
+          </div>
+        </section>
         <div class="typing-indicator hidden" id="typingIndicator">
           <div class="typing-dots">
             <div class="typing-dot"></div>
@@ -3303,7 +3463,16 @@
             <span class="sidebar-title">🎙 Voice</span>
             <span class="voice-count-badge" id="voiceCountBadge" style="display:none;font-size:11px;color:var(--text-muted);"></span>
           </div>
-          <div class="sidebar-body" style="padding:8px;">
+          <div class="sidebar-body" style="padding:8px;position:relative;">
+            <!-- Voice loading overlay (shown while joining) -->
+            <div class="voice-loading-overlay" id="voiceLoadingOverlay">
+              <div class="voice-loading-spinner"></div>
+              <div class="voice-loading-step">
+                <strong id="voiceLoadingTitle">Joining voice…</strong>
+                <span id="voiceLoadingDesc">Starting up</span>
+              </div>
+            </div>
+
             <!-- Preview: who's in VC (visible before joining) -->
             <div class="voice-preview-panel" id="voicePreviewPanel" style="display:none; margin-bottom:6px;">
               <div class="voice-preview-label" style="font-size:11px;color:var(--text-soft);margin-bottom:4px;">Currently in voice:</div>
@@ -4029,6 +4198,12 @@
       closeAdminModal();
       closeConfirmModal();
       messagesEl.innerHTML = "";
+      // Reset pagination state
+      allDocs = [];
+      renderedIds.clear();
+      oldestCursor = null;
+      firstLoadDone = false;
+      loadOlderBtn.classList.remove('visible');
       emptyStateEl.style.display = "none";
       membersList.innerHTML = "";
       memberCountLabel.textContent = "0";
@@ -4045,11 +4220,11 @@
     }
 
     function smoothScrollMessagesToBottom() {
-      messagesEl.scrollTo({
-        top: messagesEl.scrollHeight,
-        behavior: "smooth"
-      });
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
     }
+
+    // Load-older button (manual fallback for the sentinel)
+    loadOlderBtn.addEventListener('click', loadOlderMessages);
 
     function openAdminModal() {
       if (!currentUser || !currentProfile.isAdmin) return;
@@ -4222,167 +4397,359 @@
       return frag;
     }
 
-    function renderMessages(snapshot) {
-      lastMessageSnapshot = snapshot;
-      messageDataMap; // keep reference
-      // Update messageDataMap
-      Object.keys(messageDataMap).forEach(k => delete messageDataMap[k]);
-      snapshot.docs.forEach(doc => { messageDataMap[doc.id] = { id: doc.id, ...doc.data() }; });
+    // ── Message pagination + virtual rendering ────────────────────────────────
+    const MSG_PAGE      = 60;   // messages per live-window (Firestore limit)
+    const MSG_TOTAL_MAX = 500;  // absolute max we hold in memory
+    const RENDER_BUFFER = 15;   // extra messages above/below viewport to pre-render
+    const ROW_EST_HEIGHT = 72;  // estimated px per message row (for placeholder sizing)
 
-      messagesEl.innerHTML = "";
-      const docs = snapshot.docs;
+    // allDocs: full ordered list of {id, data} we've fetched
+    let allDocs         = [];
+    // rendered set: doc IDs currently in the DOM as real rows (not placeholders)
+    let renderedIds     = new Set();
+    // cursor for "load older" — the oldest doc we have
+    let oldestCursor    = null;
+    let loadingOlder    = false;
+    let firstLoadDone   = false;
 
-      if (docs.length === 0) {
+    const chatSkeleton    = document.getElementById('chatSkeleton');
+    const loadOlderBtn    = document.getElementById('loadOlderBtn');
+    const loadOlderSent   = document.getElementById('loadOlderSentinel');
+
+    // ── Build a real DOM row for one doc ─────────────────────────────────────
+    function buildMessageRow(doc) {
+      const data = doc.data ? doc.data() : doc._data;
+      const id   = doc.id;
+      const uid  = data.uid;
+      const text = data.text || "";
+      const imageData  = data.imageUrl || data.imageData || null;
+      const imageName  = data.imageName || "attachment";
+      const replyTo    = data.replyTo || null;
+
+      const profile     = userCache[uid] || {};
+      const displayName = profile.displayName || "Unknown";
+      const photoData   = profile.photoData || null;
+      const email       = profile.email || null;
+      const isSelf      = currentUser && uid === currentUser.uid;
+
+      const row = document.createElement("div");
+      row.className = "message-row" + (isSelf ? " self" : "");
+      row.dataset.messageId = id;
+
+      if (!isSelf) {
+        const avatar = document.createElement("div");
+        avatar.className = "message-avatar";
+        if (photoData) {
+          const img = document.createElement("img");
+          img.src = photoData; img.alt = displayName; img.className = "message-avatar-img";
+          avatar.appendChild(img);
+        } else {
+          const span = document.createElement("span");
+          span.textContent = initialsFromName(displayName, email);
+          avatar.appendChild(span);
+        }
+        row.appendChild(avatar);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+
+      const header = document.createElement("div");
+      header.className = "message-bubble-header";
+      const meta   = document.createElement("div");
+      meta.className = "message-meta";
+      const author = document.createElement("span");
+      author.className = "message-author";
+      const authorSpan = document.createElement("span");
+      authorSpan.textContent = isSelf ? "You" : displayName;
+      author.appendChild(authorSpan);
+      const isAdminEmailFlag = isAdminEmail(email);
+      const isSuper = isSuperAdminEmail(email);
+      if (isAdminEmailFlag) author.appendChild(createAdminBadge(isSuper));
+      const time = document.createElement("span");
+      time.className = "message-time";
+      time.textContent = formatTime(data.createdAt);
+      meta.appendChild(author); meta.appendChild(time);
+      header.appendChild(meta);
+
+      const replyBtn = document.createElement("button");
+      replyBtn.className = "message-reply-btn"; replyBtn.type = "button"; replyBtn.title = "Reply";
+      replyBtn.innerHTML = "↩";
+      replyBtn.addEventListener("click", e => { e.stopPropagation(); startReply(id, displayName, text, imageData); });
+      header.appendChild(replyBtn);
+
+      const canDelete = currentUser && (currentProfile.isAdmin || isSelf);
+      if (canDelete) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "message-delete-btn"; delBtn.type = "button";
+        delBtn.innerHTML = "✕"; delBtn.title = isSelf ? "Delete your message" : "Delete message";
+        delBtn.addEventListener("click", e => deleteMessage(id, uid, e.shiftKey));
+        header.appendChild(delBtn);
+      }
+      bubble.appendChild(header);
+
+      if (replyTo) {
+        const quote = document.createElement("div");
+        quote.className = "message-reply-quote";
+        const qa = document.createElement("div"); qa.className = "message-reply-quote-author";
+        qa.textContent = "↩ " + (replyTo.authorName || "Unknown");
+        const qt = document.createElement("div"); qt.className = "message-reply-quote-text";
+        qt.textContent = replyTo.text ? (replyTo.text.length > 80 ? replyTo.text.slice(0,80)+"…" : replyTo.text) : (replyTo.hasImage ? "📷 Image" : "");
+        quote.appendChild(qa); quote.appendChild(qt);
+        quote.addEventListener("click", () => scrollToMessage(replyTo.messageId));
+        bubble.appendChild(quote);
+      }
+
+      if (text) {
+        const textEl = document.createElement("div");
+        textEl.className = "message-text";
+        textEl.appendChild(renderMentionText(text));
+        bubble.appendChild(textEl);
+      }
+
+      if (imageData) {
+        const wrap = document.createElement("div"); wrap.className = "message-image-wrap";
+        const img  = document.createElement("img");
+        img.className = "message-image"; img.src = imageData; img.alt = imageName;
+        img.title = "Click to enlarge";
+        img.addEventListener("click", () => openLightbox(imageData, imageName));
+        wrap.appendChild(img);
+        const lbl = document.createElement("div"); lbl.className = "message-file-label"; lbl.textContent = imageName;
+        wrap.appendChild(lbl);
+        bubble.appendChild(wrap);
+      }
+
+      row.appendChild(bubble);
+      return row;
+    }
+
+    // ── Virtual DOM reconciler ────────────────────────────────────────────────
+    // Reads allDocs and updates the DOM to match, using placeholders for
+    // off-screen messages to preserve scroll height without rendering them.
+    function reconcileVirtualDOM(scrollToBottomAfter) {
+      if (allDocs.length === 0) {
+        messagesEl.innerHTML = "";
+        messagesEl.prepend(loadOlderBtn);
+        messagesEl.prepend(loadOlderSent);
         emptyStateEl.style.display = "block";
+        renderedIds.clear();
         return;
       }
       emptyStateEl.style.display = "none";
 
-      docs.forEach((doc) => {
-        const data = doc.data();
-        const uid = data.uid;
-        const text = data.text || "";
-        const imageData = data.imageUrl || data.imageData || null;
-        const imageName = data.imageName || "attachment";
-        const replyTo = data.replyTo || null; // { messageId, authorName, text }
+      // Determine which indices are "in view" (with buffer)
+      const scrollTop    = messagesEl.scrollTop;
+      const clientHeight = messagesEl.clientHeight;
+      const viewTop      = scrollTop - RENDER_BUFFER * ROW_EST_HEIGHT;
+      const viewBot      = scrollTop + clientHeight + RENDER_BUFFER * ROW_EST_HEIGHT;
 
-        const profile = userCache[uid] || {};
-        const displayName = profile.displayName || "Unknown";
-        const photoData = profile.photoData || null;
-        const email = profile.email || null;
-        const isSelf = currentUser && uid === currentUser.uid;
+      // Estimate positions from index (crude but effective for proportional decisions)
+      const totalDocs = allDocs.length;
 
-        const row = document.createElement("div");
-        row.className = "message-row" + (isSelf ? " self" : "");
-        row.dataset.messageId = doc.id;
+      // Walk the DOM. For each existing element we either keep, replace, or
+      // add new ones. It's simplest to rebuild the child list into a fragment.
+      const frag     = document.createDocumentFragment();
+      frag.appendChild(loadOlderSent);
+      frag.appendChild(loadOlderBtn);
 
-        if (!isSelf) {
-          const avatar = document.createElement("div");
-          avatar.className = "message-avatar";
-          if (photoData) {
-            const img = document.createElement("img");
-            img.src = photoData;
-            img.alt = displayName || email || "avatar";
-            img.className = "message-avatar-img";
-            avatar.appendChild(img);
+      let estimatedY = 0;
+      for (let i = 0; i < totalDocs; i++) {
+        const doc      = allDocs[i];
+        const id       = doc.id;
+        const inView   = estimatedY >= viewTop && estimatedY <= viewBot;
+
+        if (inView) {
+          // Render real row
+          const existing = messagesEl.querySelector(`[data-message-id="${id}"]`);
+          if (existing && !existing.classList.contains('msg-placeholder')) {
+            frag.appendChild(existing);
           } else {
-            const span = document.createElement("span");
-            span.textContent = initialsFromName(displayName, email);
-            avatar.appendChild(span);
+            if (existing) existing.remove();
+            const row = buildMessageRow(doc);
+            frag.appendChild(row);
+            renderedIds.add(id);
           }
-          row.appendChild(avatar);
+          estimatedY += ROW_EST_HEIGHT; // rough
+        } else {
+          // Placeholder — reuse existing if height known, else estimate
+          const existing   = messagesEl.querySelector(`[data-message-id="${id}"]`);
+          const knownH     = existing ? existing.offsetHeight : ROW_EST_HEIGHT;
+          const ph         = document.createElement("div");
+          ph.className     = "msg-placeholder";
+          ph.dataset.messageId = id;
+          ph.style.height  = knownH + "px";
+          frag.appendChild(ph);
+          if (existing && !existing.classList.contains('msg-placeholder')) renderedIds.delete(id);
+          estimatedY += knownH;
         }
+      }
 
-        const bubble = document.createElement("div");
-        bubble.className = "message-bubble";
+      // Preserve scroll position while swapping children
+      const prevScrollTop = messagesEl.scrollTop;
+      const prevScrollH   = messagesEl.scrollHeight;
+      messagesEl.innerHTML = "";
+      messagesEl.appendChild(frag);
 
-        const header = document.createElement("div");
-        header.className = "message-bubble-header";
+      if (scrollToBottomAfter) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else {
+        // Keep relative scroll position
+        const delta = messagesEl.scrollHeight - prevScrollH;
+        messagesEl.scrollTop = prevScrollTop + (delta > 0 ? delta : 0);
+      }
+    }
 
-        const meta = document.createElement("div");
-        meta.className = "message-meta";
-
-        const author = document.createElement("span");
-        author.className = "message-author";
-        const authorNameSpan = document.createElement("span");
-        authorNameSpan.textContent = isSelf ? "You" : displayName;
-        author.appendChild(authorNameSpan);
-        const isAdminEmailFlag = isAdminEmail(email);
-        const isSuper = isSuperAdminEmail(email);
-        if (isAdminEmailFlag) author.appendChild(createAdminBadge(isSuper));
-
-        const time = document.createElement("span");
-        time.className = "message-time";
-        time.textContent = formatTime(data.createdAt);
-
-        meta.appendChild(author);
-        meta.appendChild(time);
-        header.appendChild(meta);
-
-        // Reply button
-        const replyBtn = document.createElement("button");
-        replyBtn.className = "message-reply-btn";
-        replyBtn.type = "button";
-        replyBtn.title = "Reply";
-        replyBtn.innerHTML = "↩";
-        replyBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          startReply(doc.id, displayName, text, imageData);
+    // IntersectionObserver: when a placeholder scrolls into view, upgrade it
+    let upgradeObserver = null;
+    function initUpgradeObserver() {
+      if (upgradeObserver) upgradeObserver.disconnect();
+      upgradeObserver = new IntersectionObserver(entries => {
+        let upgraded = false;
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const id  = entry.target.dataset.messageId;
+          const doc = allDocs.find(d => d.id === id);
+          if (!doc || renderedIds.has(id)) return;
+          const real = buildMessageRow(doc);
+          entry.target.replaceWith(real);
+          renderedIds.add(id);
+          upgraded = true;
         });
-        header.appendChild(replyBtn);
+      }, { root: messagesEl, rootMargin: `${RENDER_BUFFER * ROW_EST_HEIGHT}px 0px` });
 
-        const canDelete = currentUser && (currentProfile.isAdmin || isSelf);
-        if (canDelete) {
-          const delBtn = document.createElement("button");
-          delBtn.className = "message-delete-btn";
-          delBtn.type = "button";
-          delBtn.innerHTML = "✕";
-          delBtn.title = isSelf ? "Delete your message" : "Delete message";
-          delBtn.addEventListener("click", (e) => deleteMessage(doc.id, uid, e.shiftKey));
-          header.appendChild(delBtn);
+      // Observe all placeholders
+      messagesEl.querySelectorAll('.msg-placeholder').forEach(el => upgradeObserver.observe(el));
+    }
+
+    // Load-older sentinel observer: when user scrolls to top, fetch older page
+    let sentinelObserver = null;
+    function initSentinelObserver() {
+      if (sentinelObserver) sentinelObserver.disconnect();
+      sentinelObserver = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting && !loadingOlder && oldestCursor) {
+          loadOlderMessages();
         }
+      }, { root: messagesEl, threshold: 0 });
+      sentinelObserver.observe(loadOlderSent);
+    }
 
-        bubble.appendChild(header);
+    async function loadOlderMessages() {
+      if (loadingOlder || !oldestCursor) return;
+      loadingOlder = true;
+      loadOlderBtn.textContent = "Loading…";
+      try {
+        const snap = await db.collection("messages")
+          .orderBy("createdAt", "desc")
+          .startAfter(oldestCursor)
+          .limit(MSG_PAGE)
+          .get();
 
-        // Reply quote block
-        if (replyTo) {
-          const quote = document.createElement("div");
-          quote.className = "message-reply-quote";
-          const quoteAuthor = document.createElement("div");
-          quoteAuthor.className = "message-reply-quote-author";
-          quoteAuthor.textContent = "↩ " + (replyTo.authorName || "Unknown");
-          const quoteText = document.createElement("div");
-          quoteText.className = "message-reply-quote-text";
-          quoteText.textContent = replyTo.text
-            ? (replyTo.text.length > 80 ? replyTo.text.slice(0, 80) + "…" : replyTo.text)
-            : (replyTo.hasImage ? "📷 Image" : "");
-          quote.appendChild(quoteAuthor);
-          quote.appendChild(quoteText);
-          // Click quote to scroll to original message
-          quote.addEventListener("click", () => scrollToMessage(replyTo.messageId));
-          bubble.appendChild(quote);
+        if (snap.empty) {
+          oldestCursor = null;
+          loadOlderBtn.classList.remove('visible');
+          sentinelObserver && sentinelObserver.disconnect();
+        } else {
+          // Prepend older docs (they come in desc order, so reverse them)
+          const older = [...snap.docs].reverse();
+          oldestCursor = snap.docs[snap.docs.length - 1]; // new oldest
+          older.forEach(d => { messageDataMap[d.id] = { id: d.id, ...d.data() }; });
+          allDocs.unshift(...older);
+          // Trim to max
+          if (allDocs.length > MSG_TOTAL_MAX) allDocs = allDocs.slice(allDocs.length - MSG_TOTAL_MAX);
+          reconcileVirtualDOM(false);
+          initUpgradeObserver();
+          loadOlderBtn.textContent = "⬆ Load older messages";
+          loadOlderBtn.classList.toggle('visible', !!oldestCursor);
         }
+      } catch(e) {
+        console.warn('loadOlderMessages error:', e);
+        loadOlderBtn.textContent = "⬆ Load older messages";
+      }
+      loadingOlder = false;
+    }
 
-        // Message text with @mention highlights
-        if (text) {
-          const textEl = document.createElement("div");
-          textEl.className = "message-text";
-          textEl.appendChild(renderMentionText(text));
-          bubble.appendChild(textEl);
-        }
+    // ── Main Firestore snapshot handler ───────────────────────────────────────
+    function renderMessages(snapshot) {
+      lastMessageSnapshot = snapshot;
 
-        // Image
-        if (imageData) {
-          const imageWrap = document.createElement("div");
-          imageWrap.className = "message-image-wrap";
-          const image = document.createElement("img");
-          image.className = "message-image";
-          image.src = imageData;
-          image.alt = imageName;
-          image.title = "Click to enlarge";
-          image.addEventListener("click", () => openLightbox(imageData, imageName));
-          imageWrap.appendChild(image);
-          const fileLabel = document.createElement("div");
-          fileLabel.className = "message-file-label";
-          fileLabel.textContent = imageName;
-          imageWrap.appendChild(fileLabel);
-          bubble.appendChild(imageWrap);
-        }
+      // First load: hide skeleton, do full reconcile, scroll to bottom
+      const isFirstLoad = !firstLoadDone;
+      firstLoadDone = true;
+      if (chatSkeleton) chatSkeleton.remove();
 
-        row.appendChild(bubble);
-        messagesEl.appendChild(row);
-      });
+      // Update messageDataMap
+      snapshot.docs.forEach(doc => { messageDataMap[doc.id] = { id: doc.id, ...doc.data() }; });
 
-      smoothScrollMessagesToBottom();
+      // For incremental updates (docChanges), merge into allDocs efficiently
+      if (!isFirstLoad) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            // New message — append to end (it's the latest)
+            const exists = allDocs.some(d => d.id === change.doc.id);
+            if (!exists) allDocs.push(change.doc);
+          } else if (change.type === 'modified') {
+            const idx = allDocs.findIndex(d => d.id === change.doc.id);
+            if (idx !== -1) allDocs[idx] = change.doc;
+            // Remove from rendered so it gets rebuilt
+            renderedIds.delete(change.doc.id);
+            const el = messagesEl.querySelector(`[data-message-id="${change.doc.id}"]`);
+            if (el) el.remove();
+          } else if (change.type === 'removed') {
+            allDocs = allDocs.filter(d => d.id !== change.doc.id);
+            renderedIds.delete(change.doc.id);
+            const el = messagesEl.querySelector(`[data-message-id="${change.doc.id}"]`);
+            if (el) el.remove();
+          }
+        });
+
+        // Check if user is near bottom before reconciling
+        const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+        reconcileVirtualDOM(atBottom);
+        initUpgradeObserver();
+        return;
+      }
+
+      // First load: set up allDocs from scratch
+      allDocs = [...snapshot.docs];
+
+      // Oldest cursor for pagination (the first doc, since we're in asc order)
+      // We'll load older pages in DESC order so cursor is the first doc
+      if (allDocs.length >= MSG_PAGE) {
+        oldestCursor = allDocs[0]; // the oldest doc we currently have
+        loadOlderBtn.classList.add('visible');
+      } else {
+        oldestCursor = null;
+        loadOlderBtn.classList.remove('visible');
+      }
+
+      reconcileVirtualDOM(true);
+      initUpgradeObserver();
+      initSentinelObserver();
     }
 
     function subscribeToMessages() {
       if (unsubscribeMessages) unsubscribeMessages();
+      firstLoadDone = false;
+      allDocs = [];
+      renderedIds.clear();
+      oldestCursor = null;
+      // Show skeleton
+      if (!document.getElementById('chatSkeleton')) {
+        const sk = document.createElement('div');
+        sk.id = 'chatSkeleton'; sk.className = 'skeleton-wrap';
+        sk.innerHTML = `
+          <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:180px;height:38px;"></div></div>
+          <div class="skeleton-row self"><div class="skeleton-bubble" style="width:140px;height:28px;"></div></div>
+          <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:220px;height:48px;"></div></div>
+          <div class="skeleton-row self"><div class="skeleton-bubble" style="width:160px;height:28px;"></div></div>
+          <div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-bubble" style="width:200px;height:60px;"></div></div>`;
+        messagesEl.appendChild(sk);
+      }
       unsubscribeMessages = db
         .collection("messages")
         .orderBy("createdAt", "asc")
-        .limit(200)
-        .onSnapshot(renderMessages, (err) => {
+        .limitToLast(MSG_PAGE)
+        .onSnapshot(renderMessages, err => {
           console.error("Error listening to messages:", err);
         });
     }
@@ -5568,6 +5935,20 @@
     const micMeterPeak = document.getElementById('micMeterPeak');
     const micMeterVal  = document.getElementById('micMeterVal');
     const hearBtn      = document.getElementById('hearYourselfBtn');
+    const voiceLoadingOverlay = document.getElementById('voiceLoadingOverlay');
+    const voiceLoadingTitle   = document.getElementById('voiceLoadingTitle');
+    const voiceLoadingDesc    = document.getElementById('voiceLoadingDesc');
+
+    function showVoiceLoading(title, desc) {
+      if (!voiceLoadingOverlay) return;
+      voiceLoadingTitle.textContent = title;
+      voiceLoadingDesc.textContent  = desc;
+      voiceLoadingOverlay.classList.add('visible');
+    }
+    function hideVoiceLoading() {
+      if (!voiceLoadingOverlay) return;
+      voiceLoadingOverlay.classList.remove('visible');
+    }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     let _cachedName  = null;
@@ -6050,33 +6431,26 @@
       if (!user) { alert('Sign in to use voice chat.'); return; }
       if (inVoice) return;
 
-      // Unlock iOS audio session NOW — we are inside the button click handler (user gesture).
-      // Must be synchronous before any await, or iOS won't count it as a gesture.
+      // Unlock iOS audio session NOW — must be synchronous before any await
       unlockAudioSession();
 
       myUid = user.uid;
       sessionId++;
+
+      showVoiceLoading('Joining voice…', 'Fetching your profile');
       setStatus('Fetching profile…');
       await fetchMyProfile();
 
+      showVoiceLoading('Joining voice…', 'Requesting microphone access');
       setStatus('Requesting microphone…');
       try {
-        // Try rich constraints first (echo cancellation, noise suppression)
         localStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 48000
-          },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 },
           video: false
-        }).catch(() =>
-          // Fallback: bare minimum — works on all Android/iOS browsers
-          navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        );
-        // Resume AudioContext — already unlocked by the button click gesture
+        }).catch(() => navigator.mediaDevices.getUserMedia({ audio: true, video: false }));
         await getAudioCtx().resume().catch(() => {});
       } catch(e) {
+        hideVoiceLoading();
         setStatus('Microphone access denied. Check browser permissions.');
         console.error(e); return;
       }
@@ -6085,52 +6459,86 @@
       if (an) localAnalyser = an;
       inVoice = true;
 
-      // 1. Purge any stale signals from previous sessions
+      showVoiceLoading('Joining voice…', 'Connecting to voice room');
+      // 1. Purge stale signals
       await purgeMyInbox();
 
       // 2. Listen for signals BEFORE writing to room
-      //    so we don't miss offers from peers who react instantly to our join
       listenSignals();
       listenKicks();
 
       // 3. Write ourselves into the room doc
       await joinRoomDoc();
 
-      // 4. Connect to peers already present at join time.
-      //    BOTH polite and impolite peers call createPeer — the polite/impolite
-      //    flag inside createPeer determines who actually sends the offer.
-      //    This guarantees a connection attempt regardless of join order.
+      showVoiceLoading('Joining voice…', 'Establishing peer connections');
+      // 4. Connect to peers already present
       try {
         const snap = await ROOM_REF().get();
         if (snap.exists) {
           const parts = snap.data().participants || {};
-          for (const uid of Object.keys(parts)) {
-            if (uid === myUid || peers[uid] || peersLock.has(uid)) continue;
-            const polite = myUid > uid;
-            await createPeer(uid, polite);
+          const uids  = Object.keys(parts).filter(uid => uid !== myUid && !peers[uid] && !peersLock.has(uid));
+          for (const uid of uids) {
+            await createPeer(uid, myUid > uid);
           }
         }
       } catch(e) { console.warn('[voice] initial peer setup error:', e); }
 
-      // 5. Watch room for future joins/leaves
+      // 5. Watch room, start meters
       listenRoom();
       startSpeakLoop();
       startMicMeter();
 
+      // Show UI
       joinBtn.classList.add('active');
       joinBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg> Connected`;
       livePanel.classList.add('open');
       previewPanel.style.display = 'none';
       countBadge.style.display   = 'none';
+      hideVoiceLoading();
       setStatus('You joined voice.');
+
+      // Watch connection states to update participant badges
+      watchPeerStates();
+    }
+
+    // ── Peer connection state badges ──────────────────────────────────────────
+    let peerStateInterval = null;
+    function watchPeerStates() {
+      if (peerStateInterval) clearInterval(peerStateInterval);
+      peerStateInterval = setInterval(() => {
+        if (!inVoice) { clearInterval(peerStateInterval); return; }
+        Object.entries(peers).forEach(([uid, p]) => {
+          const row = participants.querySelector(`[data-uid="${uid}"]`);
+          if (!row) return;
+          let badge = row.parentElement.querySelector('.voice-peer-state');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'voice-peer-state';
+            row.parentElement.appendChild(badge);
+          }
+          const state = p.pc.connectionState || p.pc.iceConnectionState || 'new';
+          badge.className = 'voice-peer-state ' + (
+            state === 'connected'    ? 'connected'   :
+            state === 'failed' || state === 'disconnected' ? 'failed' : 'connecting'
+          );
+          badge.textContent =
+            state === 'connected'     ? 'Connected'    :
+            state === 'failed'        ? 'Failed'       :
+            state === 'disconnected'  ? 'Dropped'      :
+            state === 'checking'      ? 'Connecting…'  :
+            'Connecting…';
+        });
+      }, 1000);
     }
 
     // ── Leave ─────────────────────────────────────────────────────────────────
     async function leaveVoice() {
       if (!inVoice) return;
       inVoice = false;
-      sessionId++; // immediately invalidates all queued signal callbacks
+      sessionId++;
 
+      hideVoiceLoading();
+      if (peerStateInterval) { clearInterval(peerStateInterval); peerStateInterval = null; }
       stopSpeakLoop();
       stopMicMeter();
       stopHearYourself();
