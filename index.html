@@ -4311,18 +4311,7 @@
               <span class="changelog-date">April 28, 2026</span>
             </div>
             <div class="changelog-title">🎉 v1.0 Release</div>
-            <div class="changelog-notes">ORBIT is officially 1.0! This release brings replies (tap ↩ on any message), @mention autocomplete with highlighting, image lightboxes (click any image to enlarge), voice chat improvements with reliable peer-to-peer audio and green speaking indicators, full mobile support, and dark Nebula Blue & Hydrogen Red themes.</div>
-          </div>
-
-               ════════════════════════════════════════════ -->
-
-                    <div class="changelog-entry">
-            <div class="changelog-version">
-              <span class="changelog-tag" style="background:linear-gradient"(135deg,#ff8a3d,#ffca69,#8aa9ff,#5b4bff);color:#050712;">v1.0</span>
-              <span class="changelog-date">April 28, 2026</span>
-            </div>
-            <div class="changelog-title">🎉 v1.0 Release</div>
-            <div class="changelog-notes">ORBIT is officially 1.0! This release brings replies (tap ↩ on any message), @mention autocomplete with highlighting, image lightboxes (click any image to enlarge), voice chat improvements with reliable peer-to-peer audio and green speaking indicators, full mobile support, and dark Nebula Blue & Hydrogen Red themes.</div>
+            <div class="changelog-notes">ORBIT is officially 1.0! This release brings replies (tap ↩ on any message), @mention autocomplete with highlighting, image lightboxes (click any image to enlarge), voice chat improvements with reliable peer-to-peer audio and green speaking indicators, full mobile support, and dark Nebula Blue &amp; Hydrogen Red themes.</div>
           </div>
 
           <div class="changelog-entry">
@@ -5177,7 +5166,8 @@
       }
 
       if (gameInvite) {
-        bubble.appendChild(buildGameInviteBubble(gameInvite));
+        const fn = window.buildGameInviteBubble || buildGameInviteBubble;
+        bubble.appendChild(fn(gameInvite));
       }
 
       row.appendChild(bubble);
@@ -8630,8 +8620,9 @@
     }
 
     // ── Render game invites in chat messages ─────────────────────────────────
-    // This function is called from buildMessageRow when a message has gameInvite
-    function buildGameInviteBubble(invite) {
+    // This function is called from buildMessageRow when a message has gameInvite.
+    // Exposed on window because buildMessageRow lives in a separate script block.
+    window.buildGameInviteBubble = function buildGameInviteBubble(invite) {
       const wrap = document.createElement('div');
       wrap.className = 'game-invite-bubble';
 
