@@ -462,6 +462,17 @@
       will-change: opacity;
     }
 
+    /* Grouped follow-on message: tighter spacing, avatar placeholder for alignment */
+    .message-row.grouped {
+      margin-top: 1px;
+    }
+
+    /* Avatar spacer so grouped bubbles stay aligned under the real avatar */
+    .message-avatar-spacer {
+      width: 28px;
+      flex-shrink: 0;
+    }
+
     .message-row.self {
       justify-content: flex-end;
     }
@@ -2464,6 +2475,41 @@
       flex-shrink: 0;
     }
 
+    /* ── Date separator ── */
+    .date-separator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 6px;
+      color: var(--text-soft);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      user-select: none;
+    }
+    .date-separator::before,
+    .date-separator::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
+    /* Grouped follow-on: hide header by default, reveal on bubble hover */
+    .message-row.grouped .message-bubble-header {
+      display: none;
+    }
+    .message-row.grouped .message-bubble:hover .message-bubble-header {
+      display: flex;
+    }
+    .message-row.grouped .message-bubble:hover .message-reply-btn,
+    .message-row.grouped .message-bubble:hover .message-delete-btn {
+      opacity: 1;
+    }
+    .message-row.grouped .message-bubble {
+      padding-top: 5px;
+    }
+
     .load-older-btn {
       align-self: center;
       background: var(--accent-soft);
@@ -4417,8 +4463,60 @@
     // Wire load-older button (manual fallback for the sentinel observer)
     loadOlderBtn.addEventListener('click', loadOlderMessages);
 
+    // ── Grouping helpers ──────────────────────────────────────────────────────
+    const GROUP_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+    function getDocTs(doc) {
+      const d = doc.data ? doc.data() : doc._data;
+      const ts = d.createdAt;
+      if (!ts) return 0;
+      return ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds * 1000 : 0);
+    }
+
+    // Returns { isGrouped, showDate } for doc at index i
+    function groupingInfo(i) {
+      const doc  = allDocs[i];
+      const prev = allDocs[i - 1];
+      const data = doc.data ? doc.data() : doc._data;
+      const uid  = data.uid;
+      const ts   = getDocTs(doc);
+
+      let isGrouped = false;
+      let showDate  = false;
+
+      if (prev) {
+        const pd   = prev.data ? prev.data() : prev._data;
+        const pUid = pd.uid;
+        const pTs  = getDocTs(prev);
+        const sameUser  = uid === pUid;
+        const closeTime = (ts - pTs) < GROUP_WINDOW_MS;
+        const hasReply  = !!(data.replyTo);
+        isGrouped = sameUser && closeTime && !hasReply;
+
+        // Show date separator when day changes
+        const d1 = new Date(pTs);
+        const d2 = new Date(ts);
+        showDate = d1.toDateString() !== d2.toDateString();
+        if (showDate) isGrouped = false; // day break always resets grouping
+      } else {
+        showDate = true; // always show date for first message
+      }
+
+      return { isGrouped, showDate };
+    }
+
+    function formatDateSep(ts) {
+      if (!ts) return '';
+      const d   = new Date(ts);
+      const now = new Date();
+      if (d.toDateString() === now.toDateString()) return 'Today';
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+
     // ── Build a real DOM row for one doc ─────────────────────────────────────
-    function buildMessageRow(doc) {
+    function buildMessageRow(doc, isGrouped) {
       const data = doc.data ? doc.data() : doc._data;
       const id   = doc.id;
       const uid  = data.uid;
@@ -4434,27 +4532,35 @@
       const isSelf      = currentUser && uid === currentUser.uid;
 
       const row = document.createElement("div");
-      row.className = "message-row" + (isSelf ? " self" : "");
+      row.className = "message-row" + (isSelf ? " self" : "") + (isGrouped ? " grouped" : "");
       row.dataset.messageId = id;
 
+      // Avatar (or spacer for grouped)
       if (!isSelf) {
-        const avatar = document.createElement("div");
-        avatar.className = "message-avatar";
-        if (photoData) {
-          const img = document.createElement("img");
-          img.src = photoData; img.alt = displayName; img.className = "message-avatar-img";
-          avatar.appendChild(img);
+        if (isGrouped) {
+          const spacer = document.createElement("div");
+          spacer.className = "message-avatar-spacer";
+          row.appendChild(spacer);
         } else {
-          const span = document.createElement("span");
-          span.textContent = initialsFromName(displayName, email);
-          avatar.appendChild(span);
+          const avatar = document.createElement("div");
+          avatar.className = "message-avatar";
+          if (photoData) {
+            const img = document.createElement("img");
+            img.src = photoData; img.alt = displayName; img.className = "message-avatar-img";
+            avatar.appendChild(img);
+          } else {
+            const span = document.createElement("span");
+            span.textContent = initialsFromName(displayName, email);
+            avatar.appendChild(span);
+          }
+          row.appendChild(avatar);
         }
-        row.appendChild(avatar);
       }
 
       const bubble = document.createElement("div");
       bubble.className = "message-bubble";
 
+      // Header: always built (CSS hides it for grouped, shows on hover)
       const header = document.createElement("div");
       header.className = "message-bubble-header";
       const meta   = document.createElement("div");
@@ -4524,79 +4630,154 @@
       return row;
     }
 
-    // ── Virtual DOM reconciler ────────────────────────────────────────────────
-    // Reads allDocs and updates the DOM to match, using placeholders for
-    // off-screen messages to preserve scroll height without rendering them.
+    // ── Virtual DOM reconciler (in-place keyed diff — never clears innerHTML) ──
+    // Strategy: build the desired ordered list of nodes (real rows + date seps +
+    // placeholders), then walk the existing DOM children and insert/move/remove
+    // to match — exactly like a minimal virtual DOM, but for real DOM nodes.
+    // Because we never clear the container, scrollTop never resets.
     function reconcileVirtualDOM(scrollToBottomAfter) {
       if (allDocs.length === 0) {
-        messagesEl.innerHTML = "";
-        messagesEl.prepend(loadOlderBtn);
-        messagesEl.prepend(loadOlderSent);
+        // Empty state — clear everything except the two sentinel/button nodes
+        while (messagesEl.lastChild &&
+               messagesEl.lastChild !== loadOlderSent &&
+               messagesEl.lastChild !== loadOlderBtn) {
+          messagesEl.removeChild(messagesEl.lastChild);
+        }
+        if (!messagesEl.contains(loadOlderSent)) messagesEl.prepend(loadOlderSent);
+        if (!messagesEl.contains(loadOlderBtn))  messagesEl.insertBefore(loadOlderBtn, loadOlderSent.nextSibling);
         emptyStateEl.style.display = "block";
         renderedIds.clear();
         return;
       }
       emptyStateEl.style.display = "none";
 
-      // Determine which indices are "in view" (with buffer)
+      // Snapshot scroll position BEFORE any DOM mutation
+      const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+
+      // Build keyed map of currently live nodes (id → element)
+      const liveNodes = new Map();
+      messagesEl.querySelectorAll('[data-message-id]').forEach(el => {
+        liveNodes.set(el.dataset.messageId, el);
+      });
+
+      // Build desired ordered list of items:
+      // Each item is { type: 'date'|'row'|'placeholder', key, ... }
+      const desired = [];
+      // Always keep sentinel + button at front
+      desired.push({ type: 'sentinel' });
+      desired.push({ type: 'loadbtn' });
+
+      // Determine viewport range for virtual scroll
       const scrollTop    = messagesEl.scrollTop;
       const clientHeight = messagesEl.clientHeight;
       const viewTop      = scrollTop - RENDER_BUFFER * ROW_EST_HEIGHT;
       const viewBot      = scrollTop + clientHeight + RENDER_BUFFER * ROW_EST_HEIGHT;
+      let estimatedY = 0; // cumulative estimated pixel offset
 
-      // Estimate positions from index (crude but effective for proportional decisions)
-      const totalDocs = allDocs.length;
+      for (let i = 0; i < allDocs.length; i++) {
+        const doc = allDocs[i];
+        const id  = doc.id;
+        const { isGrouped, showDate } = groupingInfo(i);
 
-      // Walk the DOM. For each existing element we either keep, replace, or
-      // add new ones. It's simplest to rebuild the child list into a fragment.
-      const frag     = document.createDocumentFragment();
-      frag.appendChild(loadOlderSent);
-      frag.appendChild(loadOlderBtn);
+        if (showDate) {
+          desired.push({ type: 'date', key: 'date-' + id, ts: getDocTs(doc) });
+          estimatedY += 32;
+        }
 
-      let estimatedY = 0;
-      for (let i = 0; i < totalDocs; i++) {
-        const doc      = allDocs[i];
-        const id       = doc.id;
-        const inView   = estimatedY >= viewTop && estimatedY <= viewBot;
-
+        const inView = estimatedY >= viewTop && estimatedY <= viewBot;
         if (inView) {
-          // Render real row
-          const existing = messagesEl.querySelector(`[data-message-id="${id}"]`);
-          if (existing && !existing.classList.contains('msg-placeholder')) {
-            frag.appendChild(existing);
-          } else {
-            if (existing) existing.remove();
-            const row = buildMessageRow(doc);
-            frag.appendChild(row);
-            renderedIds.add(id);
-          }
-          estimatedY += ROW_EST_HEIGHT; // rough
+          desired.push({ type: 'row', key: id, doc, isGrouped });
+          estimatedY += ROW_EST_HEIGHT;
         } else {
-          // Placeholder — reuse existing if height known, else estimate
-          const existing   = messagesEl.querySelector(`[data-message-id="${id}"]`);
-          const knownH     = existing ? existing.offsetHeight : ROW_EST_HEIGHT;
-          const ph         = document.createElement("div");
-          ph.className     = "msg-placeholder";
-          ph.dataset.messageId = id;
-          ph.style.height  = knownH + "px";
-          frag.appendChild(ph);
-          if (existing && !existing.classList.contains('msg-placeholder')) renderedIds.delete(id);
-          estimatedY += knownH;
+          // Use real measured height if we already have the node
+          const existing = liveNodes.get(id);
+          const h = (existing && !existing.classList.contains('msg-placeholder'))
+            ? existing.offsetHeight
+            : ROW_EST_HEIGHT;
+          desired.push({ type: 'placeholder', key: id, height: h });
+          estimatedY += h;
         }
       }
 
-      // Preserve scroll position while swapping children
-      const prevScrollTop = messagesEl.scrollTop;
-      const prevScrollH   = messagesEl.scrollHeight;
-      messagesEl.innerHTML = "";
-      messagesEl.appendChild(frag);
+      // ── In-place keyed reconciliation ─────────────────────────────────────
+      // Walk desired list and ensure each item is the next child in the container.
+      // We keep a cursor pointing at the "next expected child position".
+      let cursor = messagesEl.firstChild; // current DOM position
 
+      function getOrCreate(item) {
+        const existing = liveNodes.get(item.key);
+        if (item.type === 'row') {
+          if (existing && !existing.classList.contains('msg-placeholder')) {
+            liveNodes.delete(item.key); // claimed
+            return existing;
+          }
+          // Build new row (may replace a stale placeholder)
+          if (existing) existing.remove();
+          liveNodes.delete(item.key);
+          const row = buildMessageRow(item.doc, item.isGrouped);
+          renderedIds.add(item.key);
+          return row;
+        }
+        if (item.type === 'placeholder') {
+          if (existing && existing.classList.contains('msg-placeholder')) {
+            existing.style.height = item.height + 'px';
+            liveNodes.delete(item.key);
+            renderedIds.delete(item.key);
+            return existing;
+          }
+          // Remove real row, create placeholder
+          if (existing) { existing.remove(); liveNodes.delete(item.key); renderedIds.delete(item.key); }
+          const ph = document.createElement('div');
+          ph.className = 'msg-placeholder';
+          ph.dataset.messageId = item.key;
+          ph.style.height = item.height + 'px';
+          return ph;
+        }
+        if (item.type === 'date') {
+          const ex = messagesEl.querySelector(`[data-date-key="${item.key}"]`);
+          if (ex) return ex;
+          const sep = document.createElement('div');
+          sep.className = 'date-separator';
+          sep.dataset.dateKey = item.key;
+          sep.textContent = formatDateSep(item.ts);
+          return sep;
+        }
+        if (item.type === 'sentinel') return loadOlderSent;
+        if (item.type === 'loadbtn')  return loadOlderBtn;
+        return null;
+      }
+
+      for (const item of desired) {
+        const node = getOrCreate(item);
+        if (!node) continue;
+
+        if (cursor === node) {
+          // Already in the right place — advance cursor
+          cursor = node.nextSibling;
+        } else if (cursor && messagesEl.contains(cursor)) {
+          // Insert before cursor (moves node if it's already in the DOM)
+          messagesEl.insertBefore(node, cursor);
+          // cursor stays — we don't advance because the node we just moved
+          // might have been the cursor's previous sibling
+        } else {
+          messagesEl.appendChild(node);
+        }
+      }
+
+      // Remove any unclaimed live nodes (stale — doc was deleted)
+      liveNodes.forEach(node => node.remove());
+
+      // Remove any orphaned date separators for days no longer in view
+      messagesEl.querySelectorAll('.date-separator').forEach(sep => {
+        const key = sep.dataset.dateKey;
+        if (!desired.some(d => d.key === key)) sep.remove();
+      });
+
+      // Restore/set scroll
       if (scrollToBottomAfter) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
-      } else {
-        // Keep relative scroll position
-        const delta = messagesEl.scrollHeight - prevScrollH;
-        messagesEl.scrollTop = prevScrollTop + (delta > 0 ? delta : 0);
+      } else if (!wasAtBottom) {
+        // Nothing to do — in-place diff preserves scrollTop automatically
       }
     }
 
@@ -4605,16 +4786,17 @@
     function initUpgradeObserver() {
       if (upgradeObserver) upgradeObserver.disconnect();
       upgradeObserver = new IntersectionObserver(entries => {
-        let upgraded = false;
         entries.forEach(entry => {
           if (!entry.isIntersecting) return;
           const id  = entry.target.dataset.messageId;
-          const doc = allDocs.find(d => d.id === id);
-          if (!doc || renderedIds.has(id)) return;
-          const real = buildMessageRow(doc);
+          if (!id) return;
+          const idx = allDocs.findIndex(d => d.id === id);
+          if (idx === -1 || renderedIds.has(id)) return;
+          const doc = allDocs[idx];
+          const { isGrouped } = groupingInfo(idx);
+          const real = buildMessageRow(doc, isGrouped);
           entry.target.replaceWith(real);
           renderedIds.add(id);
-          upgraded = true;
         });
       }, { root: messagesEl, rootMargin: `${RENDER_BUFFER * ROW_EST_HEIGHT}px 0px` });
 
@@ -4683,29 +4865,58 @@
 
       // For incremental updates (docChanges), merge into allDocs efficiently
       if (!isFirstLoad) {
+        let needsFullReconcile = false;
+        let newAdded = false;
+
         snapshot.docChanges().forEach(change => {
           if (change.type === 'added') {
-            // New message — append to end (it's the latest)
             const exists = allDocs.some(d => d.id === change.doc.id);
-            if (!exists) allDocs.push(change.doc);
+            if (!exists) {
+              allDocs.push(change.doc);
+              newAdded = true;
+            }
           } else if (change.type === 'modified') {
             const idx = allDocs.findIndex(d => d.id === change.doc.id);
             if (idx !== -1) allDocs[idx] = change.doc;
-            // Remove from rendered so it gets rebuilt
             renderedIds.delete(change.doc.id);
             const el = messagesEl.querySelector(`[data-message-id="${change.doc.id}"]`);
             if (el) el.remove();
+            needsFullReconcile = true;
           } else if (change.type === 'removed') {
             allDocs = allDocs.filter(d => d.id !== change.doc.id);
             renderedIds.delete(change.doc.id);
             const el = messagesEl.querySelector(`[data-message-id="${change.doc.id}"]`);
             if (el) el.remove();
+            needsFullReconcile = true;
           }
         });
 
-        // Check if user is near bottom before reconciling
+        if (newAdded && !needsFullReconcile) {
+          // Fast path: just append new messages at the bottom, no full reconcile
+          const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+          // Find docs that were just added (not yet in DOM)
+          const newDocs = allDocs.filter(d => !messagesEl.querySelector(`[data-message-id="${d.id}"]`));
+          newDocs.forEach((doc, offset) => {
+            const globalIdx = allDocs.indexOf(doc);
+            const { isGrouped, showDate } = groupingInfo(globalIdx);
+            if (showDate) {
+              const sep = document.createElement('div');
+              sep.className = 'date-separator';
+              sep.dataset.dateKey = 'date-' + doc.id;
+              sep.textContent = formatDateSep(getDocTs(doc));
+              messagesEl.appendChild(sep);
+            }
+            const row = buildMessageRow(doc, isGrouped);
+            renderedIds.add(doc.id);
+            messagesEl.appendChild(row);
+          });
+          if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+          initUpgradeObserver();
+          return;
+        }
+
         const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
-        reconcileVirtualDOM(atBottom);
+        reconcileVirtualDOM(newAdded && atBottom);
         initUpgradeObserver();
         return;
       }
