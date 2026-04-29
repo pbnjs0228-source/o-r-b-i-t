@@ -2601,6 +2601,8 @@
     .voice-peer-state.connecting::before { background: #f59e0b; }
     .voice-peer-state.connected::before  { background: #22c55e; }
     .voice-peer-state.failed::before     { background: #ef4444; }
+
+    button, a, [role="button"] {
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation; /* removes 300ms tap delay */
     }
@@ -8225,6 +8227,8 @@
     });
 
     // ── Snapshot handler ──────────────────────────────────────────────────────
+    let _poolTutorialShownThisSession = false;
+
     function handleGameSnapshot(data) {
       const players    = data.players || {};
       const playerList = Object.entries(players);
@@ -8243,6 +8247,7 @@
         gameLobby.style.display = 'flex';
         gameHud.style.display   = 'none';
         gameOverOverlay.classList.remove('visible');
+        _poolTutorialShownThisSession = false;
         return;
       }
 
@@ -8261,6 +8266,12 @@
         }
 
         updateHUD(data);
+
+        // Pool tutorial — show once per session when game starts
+        if (activeGameType === 'pool' && !_poolTutorialShownThisSession) {
+          _poolTutorialShownThisSession = true;
+          if (typeof maybeShowPoolTutorial === 'function') maybeShowPoolTutorial();
+        }
       }
 
       if (data.state === 'ended') {
@@ -9473,18 +9484,6 @@
       // Skip still stores "seen" so it doesn't pester again this session
       poolTutorialEl.classList.remove('visible');
     });
-
-    // Show tutorial when pool game transitions to playing
-    let _poolTutorialShownThisSession = false;
-    const _snapHandlerOrig = handleGameSnapshot;
-    function handleGameSnapshot(data) {
-      _snapHandlerOrig(data);
-      if (activeGameType === 'pool' && data.state === 'playing' && !_poolTutorialShownThisSession) {
-        _poolTutorialShownThisSession = true;
-        maybeShowPoolTutorial();
-      }
-      if (data.state === 'lobby') _poolTutorialShownThisSession = false;
-    }
 
     // ── Invite bubble (renders in chat) ───────────────────────────────────────
     // Exposed on window so the main script (script 4) can call it from buildMessageRow.
