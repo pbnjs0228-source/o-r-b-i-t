@@ -8047,7 +8047,7 @@
     let myColor         = '#ffffff';
     let myGameName      = '';
     let lastHostWrite   = 0;
-    const HOST_WRITE_MS = 66; // ~15fps writes (physics runs at 60fps locally)
+    const HOST_WRITE_MS = 150; // ~7fps Firestore writes — physics still runs at 60fps locally
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
     const gamePickerBackdrop = document.getElementById('gamePickerBackdrop');
@@ -8546,10 +8546,15 @@
       mouseTarget = { x, y };
 
       // Agar: ALL players write their mouse position to playerInputs
+      // Throttled to 10 writes/sec max — mousemove fires up to 60x/sec
       if (activeGameType==='agar' && activeGameId && auth.currentUser) {
-        GAMES_REF().doc(activeGameId).update({
-          [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
-        }).catch(()=>{});
+        const now = Date.now();
+        if (!gameCanvas._lastAgarWrite || now - gameCanvas._lastAgarWrite > 100) {
+          gameCanvas._lastAgarWrite = now;
+          GAMES_REF().doc(activeGameId).update({
+            [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
+          }).catch(()=>{});
+        }
       }
 
       // Pool: update local aim angle from mouse position around cue ball
@@ -8568,13 +8573,18 @@
       }
 
       // Pong: non-host writes own paddle position to playerInputs every move
+      // Throttled to 20 writes/sec max
       if (activeGameType==='pong' && activeGameId && auth.currentUser && !isGameHost) {
         const myUid2 = auth.currentUser.uid;
         const gs = gameState;
         if (gs?.paddles?.[myUid2]) {
-          GAMES_REF().doc(activeGameId).update({
-            [`playerInputs.${myUid2}`]: { y }
-          }).catch(()=>{});
+          const now = Date.now();
+          if (!gameCanvas._lastPongWrite || now - gameCanvas._lastPongWrite > 50) {
+            gameCanvas._lastPongWrite = now;
+            GAMES_REF().doc(activeGameId).update({
+              [`playerInputs.${myUid2}`]: { y }
+            }).catch(()=>{});
+          }
         }
       }
     });
@@ -8596,9 +8606,13 @@
         }
       }
       if (activeGameType==='agar' && activeGameId && auth.currentUser) {
-        GAMES_REF().doc(activeGameId).update({
-          [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
-        }).catch(()=>{});
+        const now = Date.now();
+        if (!gameCanvas._lastAgarWrite || now - gameCanvas._lastAgarWrite > 100) {
+          gameCanvas._lastAgarWrite = now;
+          GAMES_REF().doc(activeGameId).update({
+            [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
+          }).catch(()=>{});
+        }
       }
     },{ passive:false });
 
