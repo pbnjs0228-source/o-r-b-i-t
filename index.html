@@ -3870,6 +3870,127 @@
     }
 
     /* Dead / Game over overlay */
+    /* ── Pool tutorial overlay ── */
+    .pool-tutorial-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 8, 20, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      backdrop-filter: blur(4px);
+      padding: 16px;
+      display: none;
+    }
+    .pool-tutorial-overlay.visible { display: flex; }
+
+    .pool-tutorial-card {
+      background: linear-gradient(145deg, #0f1a2e, #0a1020);
+      border: 1px solid rgba(99,179,237,0.2);
+      border-radius: 16px;
+      padding: 24px 28px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .pool-tutorial-icon { font-size: 36px; text-align: center; }
+
+    .pool-tutorial-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2e8f0;
+      text-align: center;
+      margin: 0;
+    }
+
+    .pool-tutorial-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pool-tutorial-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .pool-tutorial-step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(99,179,237,0.18);
+      color: #63b3ed;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .pool-tutorial-step-text {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .pool-tutorial-step-text strong { color: #e2e8f0; }
+    .pool-tutorial-step-text em { color: #63b3ed; font-style: normal; font-weight: 600; }
+
+    .pool-tutorial-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .pool-tutorial-skip {
+      flex: 0;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: #64748b;
+      font-size: 12px;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 120ms, color 120ms;
+    }
+    .pool-tutorial-skip:hover { border-color: rgba(255,255,255,0.25); color: #94a3b8; }
+
+    .pool-tutorial-got-it {
+      flex: 1;
+      background: linear-gradient(135deg, #1d6a3a, #155e2f);
+      border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 8px;
+      color: #86efac;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background 120ms, transform 80ms;
+    }
+    .pool-tutorial-got-it:hover { background: linear-gradient(135deg,#1e7a40,#186832); }
+    .pool-tutorial-got-it:active { transform: scale(0.98); }
+
+    .pool-tutorial-remember {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: #475569;
+      cursor: pointer;
+      align-self: center;
+    }
+    .pool-tutorial-remember input { accent-color: #63b3ed; }
+
     .game-over-overlay {
       position: absolute;
       inset: 0;
@@ -4218,6 +4339,46 @@
       <div class="game-hud" id="gameHud" style="display:none;">
         <div class="game-hud-score" id="gameHudScore">Score: 0</div>
         <div class="game-hud-score" id="gameHudTimer"></div>
+      </div>
+      <!-- Pool Tutorial -->
+      <div class="pool-tutorial-overlay" id="poolTutorial">
+        <div class="pool-tutorial-card">
+          <div class="pool-tutorial-icon">🎱</div>
+          <h2 class="pool-tutorial-title">How to Play 8-Ball Pool</h2>
+          <div class="pool-tutorial-steps">
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">1</div>
+              <div class="pool-tutorial-step-text"><strong>Aim</strong> — Move your mouse around the cue ball. The stick rotates to follow.</div>
+            </div>
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">2</div>
+              <div class="pool-tutorial-step-text"><strong>Power</strong> — Click and drag <em>away</em> from the cue ball to pull the stick back. Further = harder shot.</div>
+            </div>
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">3</div>
+              <div class="pool-tutorial-step-text"><strong>Shoot</strong> — Release the mouse to fire. Watch the power meter on the right.</div>
+            </div>
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">4</div>
+              <div class="pool-tutorial-step-text"><strong>Groups</strong> — First ball potted decides: <span style="color:#f5c518">●</span> Solids (1–7) or <span style="color:#f5c518">◎</span> Stripes (9–15).</div>
+            </div>
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">5</div>
+              <div class="pool-tutorial-step-text"><strong>Win</strong> — Pot all your balls, then sink the <strong style="color:#fff">8-ball</strong> to win. Pot it early = instant loss!</div>
+            </div>
+            <div class="pool-tutorial-step">
+              <div class="pool-tutorial-step-num">⚠</div>
+              <div class="pool-tutorial-step-text"><strong>Scratch</strong> — Potting the white cue ball is a foul. Your opponent gets ball-in-hand.</div>
+            </div>
+          </div>
+          <div class="pool-tutorial-actions">
+            <button class="pool-tutorial-skip" id="poolTutorialSkip">Skip tutorial</button>
+            <button class="pool-tutorial-got-it" id="poolTutorialGotIt">Got it, let's play! 🎱</button>
+          </div>
+          <label class="pool-tutorial-remember">
+            <input type="checkbox" id="poolTutorialDontShow"> Don't show again
+          </label>
+        </div>
       </div>
       <!-- Game over -->
       <div class="game-over-overlay" id="gameOverOverlay">
@@ -8090,13 +8251,15 @@
         gameHud.style.display   = 'flex';
         gameOverOverlay.classList.remove('visible');
 
-        // Sync server state into local gameState.
-        // Host already has authoritative state — only clients overwrite.
         if (!isGameHost && data.gameData) {
-          gameState = JSON.parse(JSON.stringify(data.gameData)); // deep clone to avoid mutation
+          gameState = JSON.parse(JSON.stringify(data.gameData));
         }
 
-        // Update HUD
+        // Host: merge playerInputs from Firestore into gameState for physics to read
+        if (isGameHost && data.playerInputs && gameState) {
+          gameState._playerInputs = data.playerInputs;
+        }
+
         updateHUD(data);
       }
 
@@ -8351,8 +8514,13 @@
       gameState.TW=TW; gameState.TH=TH; gameState.W=W; gameState.H=H;
     }
 
-    // Pool input state
-    let poolAiming = false, poolDragStart = null, poolCueVisible = false;
+    // Pool local aim state — these are NEVER written to Firestore
+    // so they survive snapshot overwrites on non-host clients
+    let poolAiming    = false;
+    let poolAimAngle  = Math.PI; // pointing left by default (toward rack)
+    let poolAimPower  = 0;
+    let poolDragDist  = 0;
+    let poolAimActive = false; // true while mouse is held for drag
 
     // ════════════════════════════════════════════════════════════════════════
     // PHYSICS UPDATE
@@ -8362,38 +8530,135 @@
     window.addEventListener('keyup',   e => { keys[e.key]=false; });
 
     let mouseTarget = { x:0, y:0 };
-    gameCanvas.addEventListener('mousemove', e => {
-      const r = gameCanvas.getBoundingClientRect();
-      const sx = gameCanvas.width / r.width;
+
+    function getScaledXY(e) {
+      const r  = gameCanvas.getBoundingClientRect();
+      const sx = gameCanvas.width  / r.width;
       const sy = gameCanvas.height / r.height;
-      mouseTarget = { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
-      if (activeGameType==='agar' && activeGameId && isGameHost) {
-        GAMES_REF().doc(activeGameId).update({ [`playerInputs.${auth.currentUser?.uid}`]: mouseTarget }).catch(()=>{});
+      if (e.touches) {
+        return { x:(e.touches[0].clientX-r.left)*sx, y:(e.touches[0].clientY-r.top)*sy };
       }
-      if (activeGameType==='pool' && gameState && poolAiming) {
-        const cue = gameState.balls.find(b=>b.isCue);
+      return { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
+    }
+
+    gameCanvas.addEventListener('mousemove', e => {
+      const { x, y } = getScaledXY(e);
+      mouseTarget = { x, y };
+
+      // Agar: ALL players write their mouse position to playerInputs
+      if (activeGameType==='agar' && activeGameId && auth.currentUser) {
+        GAMES_REF().doc(activeGameId).update({
+          [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
+        }).catch(()=>{});
+      }
+
+      // Pool: update local aim angle from mouse position around cue ball
+      if (activeGameType==='pool' && gameState) {
+        const cue = gameState.balls?.find(b=>b.isCue&&!b.pocketed);
         if (cue) {
-          const dx = mouseTarget.x-cue.x, dy = mouseTarget.y-cue.y;
-          gameState.aim = { angle: Math.atan2(dy,dx), power: Math.min(1, Math.sqrt(dx*dx+dy*dy)/160) };
+          poolAimAngle = Math.atan2(cue.y - y, cue.x - x); // angle FROM mouse TOWARD cue
+          if (poolAimActive) {
+            const dx = x - cue.x, dy = y - cue.y;
+            const dist = Math.sqrt(dx*dx+dy*dy);
+            const maxDist = (gameState.TW||400) * 0.38;
+            poolDragDist = Math.min(dist, maxDist);
+            poolAimPower = poolDragDist / maxDist;
+          }
+        }
+      }
+
+      // Pong: non-host writes own paddle position to playerInputs every move
+      if (activeGameType==='pong' && activeGameId && auth.currentUser && !isGameHost) {
+        const myUid2 = auth.currentUser.uid;
+        const gs = gameState;
+        if (gs?.paddles?.[myUid2]) {
+          GAMES_REF().doc(activeGameId).update({
+            [`playerInputs.${myUid2}`]: { y }
+          }).catch(()=>{});
         }
       }
     });
+
     gameCanvas.addEventListener('touchmove', e=>{
       e.preventDefault();
-      const r=gameCanvas.getBoundingClientRect(), t=e.touches[0];
-      const sx=gameCanvas.width/r.width, sy=gameCanvas.height/r.height;
-      mouseTarget={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sy};
+      const { x, y } = getScaledXY(e);
+      mouseTarget = { x, y };
+      if (activeGameType==='pool' && gameState) {
+        const cue = gameState.balls?.find(b=>b.isCue&&!b.pocketed);
+        if (cue) {
+          poolAimAngle = Math.atan2(cue.y - y, cue.x - x);
+          if (poolAimActive) {
+            const dx = x-cue.x, dy = y-cue.y;
+            const maxDist = (gameState.TW||400)*0.38;
+            poolDragDist  = Math.min(Math.sqrt(dx*dx+dy*dy), maxDist);
+            poolAimPower  = poolDragDist / maxDist;
+          }
+        }
+      }
+      if (activeGameType==='agar' && activeGameId && auth.currentUser) {
+        GAMES_REF().doc(activeGameId).update({
+          [`playerInputs.${auth.currentUser.uid}`]: mouseTarget
+        }).catch(()=>{});
+      }
     },{ passive:false });
 
-    // Pool shoot on click
+    // Pool mousedown/up: start/end drag to set power + shoot
+    gameCanvas.addEventListener('mousedown', e => {
+      if (activeGameType!=='pool') return;
+      const myUid2 = auth.currentUser?.uid;
+      const gs = gameState;
+      if (!gs || gs.phase!=='aiming') return;
+      if (gs.players?.[gs.turn] !== myUid2) return; // not my turn
+      const { x, y } = getScaledXY(e);
+      const cue = gs.balls?.find(b=>b.isCue&&!b.pocketed);
+      if (!cue) return;
+      poolAimActive = true;
+      poolAimPower  = 0;
+      poolDragDist  = 0;
+      // Angle: aim toward the opposite side of where user clicked relative to cue
+      poolAimAngle  = Math.atan2(cue.y - y, cue.x - x);
+    });
+
+    gameCanvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (activeGameType!=='pool') return;
+      const myUid2 = auth.currentUser?.uid;
+      const gs = gameState;
+      if (!gs || gs.phase!=='aiming') return;
+      if (gs.players?.[gs.turn] !== myUid2) return;
+      const { x, y } = getScaledXY(e);
+      const cue = gs.balls?.find(b=>b.isCue&&!b.pocketed);
+      if (!cue) return;
+      poolAimActive = true;
+      poolAimPower  = 0;
+      poolDragDist  = 0;
+      poolAimAngle  = Math.atan2(cue.y - y, cue.x - x);
+    },{ passive:false });
+
+    function firePoolShot() {
+      if (!poolAimActive) return;
+      poolAimActive = false;
+      if (poolAimPower < 0.04) { poolAimPower = 0; return; }
+      const shot = { angle: poolAimAngle, power: poolAimPower };
+      if (isGameHost) {
+        // Host applies directly
+        applyPoolShot(shot);
+      } else {
+        // Non-host writes to playerInputs; host picks it up next tick
+        GAMES_REF().doc(activeGameId).update({
+          [`playerInputs.${auth.currentUser?.uid}`]: { poolShot: shot }
+        }).catch(()=>{});
+      }
+      poolAimPower = 0;
+      poolDragDist = 0;
+    }
+
+    gameCanvas.addEventListener('mouseup',  firePoolShot);
+    gameCanvas.addEventListener('touchend', firePoolShot);
+
+    // Pool click still handled for trivia
     gameCanvas.addEventListener('click', e => {
       if (activeGameType==='trivia') { handleTriviaClick(e); return; }
-      if (activeGameType==='pool' && isGameHost && gameState?.phase==='aiming') {
-        const myUid2 = auth.currentUser?.uid;
-        const currentPlayerUid = gameState.players?.[gameState.turn];
-        if (myUid2 !== currentPlayerUid && myUid2 !== gameState.players?.[0]) return; // only current turn player
-        shootCueBall();
-      }
     });
 
     function updateGameState(type, dt) {
@@ -8469,8 +8734,22 @@
 
       Object.entries(gs.cells).forEach(([uid,cell])=>{
         if (!cell.alive) return;
-        const tx = uid===myUid2 ? mouseTarget.x + (cell.x - gameCanvas.width/2)  : (cell.tx||WORLD/2);
-        const ty = uid===myUid2 ? mouseTarget.y + (cell.y - gameCanvas.height/2) : (cell.ty||WORLD/2);
+        let tx, ty;
+        if (uid === myUid2) {
+          // Host's own cell uses local mouseTarget
+          tx = mouseTarget.x + (cell.x - gameCanvas.width/2);
+          ty = mouseTarget.y + (cell.y - gameCanvas.height/2);
+        } else {
+          // Other cells: use playerInputs written by that player
+          const inp = gs._playerInputs?.[uid];
+          if (inp) {
+            tx = inp.x + (cell.x - gameCanvas.width/2);
+            ty = inp.y + (cell.y - gameCanvas.height/2);
+          } else {
+            tx = cell.tx || WORLD/2;
+            ty = cell.ty || WORLD/2;
+          }
+        }
         const dx=tx-cell.x, dy=ty-cell.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
         const spd = Math.max(0.8, 5-cell.r*0.035);
         if (dist>2){ cell.x+=dx/dist*spd; cell.y+=dy/dist*spd; }
@@ -8500,21 +8779,44 @@
     }
 
     // ── POOL PHYSICS ─────────────────────────────────────────────────────────
-    function shootCueBall() {
+    function applyPoolShot(shot) {
       const gs  = gameState;
-      const cue = gs.balls.find(b=>b.isCue&&!b.pocketed);
-      if (!cue||gs.phase!=='aiming') return;
-      const power = (gs.aim?.power||0.5) * 22;
-      const angle = gs.aim?.angle||0;
+      const cue = gs.balls?.find(b=>b.isCue&&!b.pocketed);
+      if (!cue || gs.phase!=='aiming') return;
+      const power = (shot.power||0.5) * 22;
+      const angle = shot.angle || 0;
       cue.vx = Math.cos(angle)*power;
       cue.vy = Math.sin(angle)*power;
       gs.phase = 'running';
       gs.ballsRunning = true;
+      // Clear consumed playerInput
+      if (activeGameId) {
+        const turnUid = gs.players?.[gs.turn];
+        if (turnUid) {
+          GAMES_REF().doc(activeGameId).update({
+            [`playerInputs.${turnUid}`]: firebase.firestore.FieldValue.delete()
+          }).catch(()=>{});
+        }
+      }
     }
 
     function updatePool(dt) {
       const gs = gameState;
-      if (!gs.balls||gs.phase!=='running') return;
+      if (!gs.balls) return;
+
+      // Host: consume non-host player's shot from playerInputs
+      if (gs.phase==='aiming') {
+        const turnUid = gs.players?.[gs.turn];
+        const inp = gs._playerInputs?.[turnUid];
+        if (inp?.poolShot) {
+          applyPoolShot(inp.poolShot);
+          // Clear the input so it's not applied again
+          if (gs._playerInputs) delete gs._playerInputs[turnUid];
+        }
+        return; // don't run physics while aiming
+      }
+
+      if (gs.phase!=='running') return;
 
       const FRICTION = 0.988;
       const BR = gs.BR||10;
@@ -8622,13 +8924,22 @@
       const p1=gs.paddles[uid1],p2=gs.paddles[uid2];
       const myUid2=auth.currentUser?.uid;
 
+      // Host (uid1) uses keyboard; non-host (uid2) uses playerInputs (mouse Y or keyboard)
       if (p1&&myUid2===uid1){
         if (keys['w']||keys['W']) p1.y=Math.max(PAD_H/2,p1.y-SPD);
         if (keys['s']||keys['S']) p1.y=Math.min(H-PAD_H/2,p1.y+SPD);
       }
-      if (p2&&myUid2===uid2){
-        if (keys['ArrowUp'])   p2.y=Math.max(PAD_H/2,p2.y-SPD);
-        if (keys['ArrowDown']) p2.y=Math.min(H-PAD_H/2,p2.y+SPD);
+      // Read uid2 input from playerInputs (written by non-host on mousemove/keydown)
+      if (p2) {
+        const inp2 = gs._playerInputs?.[uid2];
+        if (inp2?.y !== undefined) {
+          // Mouse-driven: clamp to paddle bounds
+          p2.y = Math.max(PAD_H/2, Math.min(H-PAD_H/2, inp2.y));
+        } else if (myUid2===uid2) {
+          // Fallback keyboard for uid2 if they happen to be host (solo testing)
+          if (keys['ArrowUp'])   p2.y=Math.max(PAD_H/2,p2.y-SPD);
+          if (keys['ArrowDown']) p2.y=Math.min(H-PAD_H/2,p2.y+SPD);
+        }
       }
 
       const b=gs.ball;
@@ -8920,38 +9231,64 @@
         gCtx.restore();
       });
 
-      // Cue stick + aim line (only for current turn player)
+      // Cue stick + aim line (only for current turn player, using LOCAL aim state)
       const currentPlayerUid=gs.players?.[gs.turn];
-      if (gs.phase==='aiming'&&myUid2===currentPlayerUid){
+      if (gs.phase==='aiming' && myUid2===currentPlayerUid){
         const cue=gs.balls?.find(b=>b.isCue&&!b.pocketed);
-        if (cue&&gs.aim){
-          const angle=gs.aim.angle||0;
-          const power=gs.aim.power||0.5;
-          const len=160+power*80;
+        if (cue){
+          const angle = poolAimAngle;
+          const power = poolAimPower;
+          const len   = 160 + power*80;
+
+          // Ghost ball at aim direction
+          const gx = cue.x + Math.cos(angle)*BR*2.5;
+          const gy = cue.y + Math.sin(angle)*BR*2.5;
+          gCtx.globalAlpha = 0.28;
+          gCtx.beginPath(); gCtx.arc(gx,gy,BR,0,Math.PI*2);
+          gCtx.fillStyle = '#fff'; gCtx.fill();
+          gCtx.globalAlpha = 1;
 
           // Dotted aim line
-          gCtx.setLineDash([6,6]);
-          gCtx.strokeStyle='rgba(255,255,255,0.35)'; gCtx.lineWidth=1.5;
+          gCtx.setLineDash([6,8]);
+          gCtx.strokeStyle='rgba(255,255,255,0.3)'; gCtx.lineWidth=1.5;
           gCtx.beginPath();
           gCtx.moveTo(cue.x+Math.cos(angle)*BR, cue.y+Math.sin(angle)*BR);
-          gCtx.lineTo(cue.x+Math.cos(angle)*200, cue.y+Math.sin(angle)*200);
+          gCtx.lineTo(cue.x+Math.cos(angle)*len, cue.y+Math.sin(angle)*len);
           gCtx.stroke();
           gCtx.setLineDash([]);
 
-          // Cue stick (behind the ball)
-          const backAngle=angle+Math.PI;
-          const stickStart=BR+8+power*40;
+          // Cue stick (behind the ball, opposite of aim direction)
+          const backAngle = angle + Math.PI;
+          const stickStart = BR + 8 + poolDragDist*0.55;
           gCtx.save();
-          gCtx.translate(cue.x,cue.y);
+          gCtx.translate(cue.x, cue.y);
           gCtx.rotate(backAngle);
-          const grad=gCtx.createLinearGradient(stickStart,0,stickStart+120,0);
-          grad.addColorStop(0,'#e8c97a'); grad.addColorStop(0.3,'#c9a84c'); grad.addColorStop(1,'rgba(120,80,20,0)');
+          const grad=gCtx.createLinearGradient(stickStart,0,stickStart+130,0);
+          grad.addColorStop(0,'#e8c97a');
+          grad.addColorStop(0.3,'#c9a84c');
+          grad.addColorStop(1,'rgba(120,80,20,0)');
           gCtx.lineWidth=7; gCtx.strokeStyle=grad; gCtx.lineCap='round';
           gCtx.beginPath(); gCtx.moveTo(stickStart,0); gCtx.lineTo(stickStart+130,0); gCtx.stroke();
           // Tip
-          gCtx.lineWidth=3; gCtx.strokeStyle='#e8e8e8';
-          gCtx.beginPath(); gCtx.moveTo(stickStart-2,0); gCtx.lineTo(stickStart+4,0); gCtx.stroke();
+          gCtx.lineWidth=3; gCtx.strokeStyle='#e0eeff';
+          gCtx.beginPath(); gCtx.moveTo(stickStart-3,0); gCtx.lineTo(stickStart+5,0); gCtx.stroke();
           gCtx.restore();
+
+          // Power meter bar
+          if (power > 0) {
+            const mx = gs.TX + gs.TW + 12;
+            const mH = gs.TH * 0.55;
+            const mY = gs.TY + gs.TH * 0.22;
+            gCtx.fillStyle='rgba(0,0,0,0.45)';
+            gCtx.beginPath(); gCtx.roundRect(mx, mY, 11, mH, 4); gCtx.fill();
+            const fillH = mH * power;
+            const pg = gCtx.createLinearGradient(0, mY+mH-fillH, 0, mY+mH);
+            pg.addColorStop(0,'#22c55e'); pg.addColorStop(0.6,'#f59e0b'); pg.addColorStop(1,'#ef4444');
+            gCtx.fillStyle=pg;
+            gCtx.beginPath(); gCtx.roundRect(mx, mY+mH-fillH, 11, fillH, 4); gCtx.fill();
+            gCtx.fillStyle='rgba(255,255,255,0.5)'; gCtx.font='8px system-ui'; gCtx.textAlign='center';
+            gCtx.fillText('PWR', mx+5.5, mY-4);
+          }
         }
       }
 
@@ -9097,8 +9434,42 @@
         if (isGameHost) GAMES_REF().doc(activeGameId).update({state:'ended'}).catch(()=>{});
       }
       activeGameId=null; activeGameType=null; isGameHost=false; gameState=null;
+      _poolTutorialShownThisSession = false;
+      if (poolTutorialEl) poolTutorialEl.classList.remove('visible');
       gameWindowBackdrop.classList.remove('visible');
       gameOverOverlay.classList.remove('visible');
+    }
+
+    // ── Pool tutorial ─────────────────────────────────────────────────────────
+    const poolTutorialEl        = document.getElementById('poolTutorial');
+    const poolTutorialGotItBtn  = document.getElementById('poolTutorialGotIt');
+    const poolTutorialSkipBtn   = document.getElementById('poolTutorialSkip');
+    const poolTutorialDontShow  = document.getElementById('poolTutorialDontShow');
+
+    function maybeShowPoolTutorial() {
+      if (localStorage.getItem('pool_tutorial_seen') === 'yes') return;
+      poolTutorialEl.classList.add('visible');
+    }
+    function hidePoolTutorial() {
+      poolTutorialEl.classList.remove('visible');
+      if (poolTutorialDontShow.checked) localStorage.setItem('pool_tutorial_seen', 'yes');
+    }
+    poolTutorialGotItBtn.addEventListener('click', hidePoolTutorial);
+    poolTutorialSkipBtn.addEventListener('click', () => {
+      // Skip still stores "seen" so it doesn't pester again this session
+      poolTutorialEl.classList.remove('visible');
+    });
+
+    // Show tutorial when pool game transitions to playing
+    let _poolTutorialShownThisSession = false;
+    const _snapHandlerOrig = handleGameSnapshot;
+    function handleGameSnapshot(data) {
+      _snapHandlerOrig(data);
+      if (activeGameType === 'pool' && data.state === 'playing' && !_poolTutorialShownThisSession) {
+        _poolTutorialShownThisSession = true;
+        maybeShowPoolTutorial();
+      }
+      if (data.state === 'lobby') _poolTutorialShownThisSession = false;
     }
 
     // ── Invite bubble (renders in chat) ───────────────────────────────────────
