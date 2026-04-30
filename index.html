@@ -9476,146 +9476,141 @@
       }
 
       // ── Ball tracker bar ───────────────────────────────────────────────────
-      // Drawn at the bottom of the canvas, shows both players' balls + 8
+      // Only shown after the first ball is pocketed (solidsPlayer is set).
+      // Singleplayer (p1uid missing): only P0 bar is shown.
       const myUid3   = auth.currentUser?.uid;
       const p0uid    = gs.players?.[0];
       const p1uid    = gs.players?.[1];
       const p0name   = gs.names?.[p0uid] || 'P1';
       const p1name   = gs.names?.[p1uid] || 'P2';
+      const isSolo   = !p1uid; // only one player in the game
 
-      // Determine who has solids and stripes (may be null before first pot)
-      const p0type  = !gs.solidsPlayer ? null : gs.solidsPlayer === p0uid ? 'solid' : 'stripe';
-      const p1type  = !gs.solidsPlayer ? null : gs.solidsPlayer === p1uid ? 'solid' : 'stripe';
-      const myType  = !gs.solidsPlayer ? null : gs.solidsPlayer === myUid3 ? 'solid' : 'stripe';
+      // Don't draw the bar at all until groups are assigned
+      if (gs.solidsPlayer) {
+        const p0type  = gs.solidsPlayer === p0uid ? 'solid' : 'stripe';
+        const p1type  = !isSolo ? (gs.solidsPlayer === p1uid ? 'solid' : 'stripe') : null;
 
-      // Ball IDs per group
-      const solidIds  = [1,2,3,4,5,6,7];
-      const stripeIds = [9,10,11,12,13,14,15];
+        const solidIds  = [1,2,3,4,5,6,7];
+        const stripeIds = [9,10,11,12,13,14,15];
 
-      // Bar dimensions
-      const barH   = 54;
-      const barY   = H - barH;
-      const barPad = 16;
+        const barH   = 54;
+        const barY   = H - barH;
+        const barPad = 16;
+        const halfW  = W / 2;
 
-      // Background
-      gCtx.fillStyle = 'rgba(0,0,0,0.72)';
-      gCtx.fillRect(0, barY, W, barH);
-      gCtx.strokeStyle = 'rgba(255,255,255,0.07)';
-      gCtx.lineWidth = 1;
-      gCtx.beginPath(); gCtx.moveTo(0, barY); gCtx.lineTo(W, barY); gCtx.stroke();
+        // Background
+        gCtx.fillStyle = 'rgba(0,0,0,0.72)';
+        gCtx.fillRect(0, barY, W, barH);
+        gCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+        gCtx.lineWidth = 1;
+        gCtx.beginPath(); gCtx.moveTo(0, barY); gCtx.lineTo(W, barY); gCtx.stroke();
 
-      // Helper: draw a mini ball
-      function drawMiniBall(id, cx, cy, r, dimmed) {
-        const ball = gs.balls?.find(b => b.id === id);
-        const isSolid = solidIds.includes(id);
-        const color = ball?.color || (isSolid ? solidColor(id) : stripeColor(id));
-        gCtx.save();
-        gCtx.globalAlpha = dimmed ? 0.22 : 1;
-        gCtx.beginPath(); gCtx.arc(cx, cy, r, 0, Math.PI*2);
-        if (id === 8) { gCtx.fillStyle = '#111'; }
-        else { gCtx.fillStyle = color; }
-        gCtx.fill();
-        if (!isSolid && id !== 8) {
-          // stripe band
+        // Helper: draw a mini ball
+        function drawMiniBall(id, cx, cy, r) {
+          const ball     = gs.balls?.find(b => b.id === id);
+          const isSolid  = solidIds.includes(id);
+          const color    = ball?.color || (isSolid ? solidColor(id) : stripeColor(id));
+          const pocketed = ball?.pocketed;
           gCtx.save();
-          gCtx.clip();
-          gCtx.fillStyle = '#fff';
-          gCtx.fillRect(cx-r, cy-r*0.35, r*2, r*0.7);
+          gCtx.globalAlpha = pocketed ? 0.22 : 1;
+          gCtx.beginPath(); gCtx.arc(cx, cy, r, 0, Math.PI*2);
+          gCtx.fillStyle = id === 8 ? '#111' : color;
+          gCtx.fill();
+          if (!isSolid && id !== 8) {
+            gCtx.save(); gCtx.clip();
+            gCtx.fillStyle = '#fff';
+            gCtx.fillRect(cx-r, cy-r*0.35, r*2, r*0.7);
+            gCtx.restore();
+          }
+          if (id !== 0) {
+            gCtx.fillStyle = (isSolid || id === 8) ? '#fff' : '#222';
+            gCtx.font = `bold ${Math.max(7, r*0.95)}px system-ui`;
+            gCtx.textAlign = 'center';
+            gCtx.textBaseline = 'middle';
+            gCtx.fillText(id, cx, cy + 0.5);
+          }
+          if (pocketed) {
+            gCtx.globalAlpha = 0.6;
+            gCtx.strokeStyle = '#ef4444'; gCtx.lineWidth = 1.5;
+            gCtx.beginPath();
+            gCtx.moveTo(cx-r*0.6, cy-r*0.6); gCtx.lineTo(cx+r*0.6, cy+r*0.6);
+            gCtx.moveTo(cx+r*0.6, cy-r*0.6); gCtx.lineTo(cx-r*0.6, cy+r*0.6);
+            gCtx.stroke();
+          }
           gCtx.restore();
         }
-        // Number
-        if (id !== 0) {
-          gCtx.fillStyle = (isSolid || id === 8) ? '#fff' : '#222';
-          gCtx.font = `bold ${Math.max(7, r*0.95)}px system-ui`;
-          gCtx.textAlign = 'center';
-          gCtx.textBaseline = 'middle';
-          gCtx.fillText(id, cx, cy + 0.5);
-        }
-        // Cross-out when pocketed
-        if (ball?.pocketed) {
-          gCtx.globalAlpha = 0.6;
-          gCtx.strokeStyle = '#ef4444';
-          gCtx.lineWidth = 1.5;
+
+        const bR       = 9;
+        const bSpacing = bR*2 + 5;
+
+        // ── Left side: P0 ────────────────────────────────────────────────────
+        const p0Turn  = gs.turn === 0;
+        const p0color = gs.colors?.[p0uid] || '#aaa';
+        const p0Balls = p0type === 'solid' ? solidIds : stripeIds;
+
+        gCtx.save();
+        if (p0Turn) {
+          gCtx.fillStyle = p0color;
           gCtx.beginPath();
-          gCtx.moveTo(cx-r*0.6, cy-r*0.6); gCtx.lineTo(cx+r*0.6, cy+r*0.6);
-          gCtx.moveTo(cx+r*0.6, cy-r*0.6); gCtx.lineTo(cx-r*0.6, cy+r*0.6);
-          gCtx.stroke();
+          gCtx.moveTo(barPad, barY + barH*0.5 - 5);
+          gCtx.lineTo(barPad + 7, barY + barH*0.5);
+          gCtx.lineTo(barPad, barY + barH*0.5 + 5);
+          gCtx.fill();
         }
+        gCtx.fillStyle = p0Turn ? '#fff' : 'rgba(255,255,255,0.5)';
+        gCtx.font = `${p0Turn ? 'bold' : ''} 11px system-ui`;
+        gCtx.textAlign = 'left'; gCtx.textBaseline = 'middle';
+        gCtx.fillText(p0name + (p0Turn ? ' ▸' : ''), barPad + 10, barY + 13);
         gCtx.restore();
-      }
 
-      const bR = 9;
-      const bSpacing = bR*2 + 5;
-      const halfW = W / 2;
+        let p0x = barPad + 10;
+        const p0y = barY + barH*0.62;
+        p0Balls.forEach(id => {
+          drawMiniBall(id, p0x + bR, p0y, bR);
+          p0x += bSpacing;
+        });
 
-      // ── Left side: P0 ──────────────────────────────────────────────────────
-      const p0Turn  = gs.turn === 0;
-      const p0color = gs.colors?.[p0uid] || '#aaa';
-      gCtx.save();
-      gCtx.fillStyle = p0Turn ? p0color : 'rgba(255,255,255,0.55)';
-      gCtx.font = `${p0Turn ? 'bold' : ''} 11px system-ui`;
-      gCtx.textAlign = 'left';
-      gCtx.textBaseline = 'middle';
-      if (p0Turn) {
-        // Turn arrow
-        gCtx.fillStyle = p0color;
-        gCtx.beginPath();
-        gCtx.moveTo(barPad, barY + barH*0.5 - 5);
-        gCtx.lineTo(barPad + 7, barY + barH*0.5);
-        gCtx.lineTo(barPad, barY + barH*0.5 + 5);
-        gCtx.fill();
-      }
-      gCtx.fillStyle = p0Turn ? '#fff' : 'rgba(255,255,255,0.5)';
-      gCtx.fillText(p0name + (p0Turn ? ' ▸' : ''), barPad + 10, barY + 13);
-      gCtx.restore();
-
-      const p0Balls = p0type === 'solid' ? solidIds : p0type === 'stripe' ? stripeIds : solidIds;
-      let p0x = barPad + 10;
-      const p0y = barY + barH*0.62;
-      p0Balls.forEach(id => {
-        const pocketed = gs.balls?.find(b => b.id === id)?.pocketed;
-        drawMiniBall(id, p0x + bR, p0y, bR, false);
-        p0x += bSpacing;
-      });
-      // 8-ball in middle between the two rows
-      drawMiniBall(8, halfW, barY + barH/2, bR+1, false);
-
-      // ── Right side: P1 ─────────────────────────────────────────────────────
-      const p1Turn  = gs.turn === 1;
-      const p1color = gs.colors?.[p1uid] || '#aaa';
-      const p1Balls = p1type === 'solid' ? solidIds : p1type === 'stripe' ? stripeIds : stripeIds;
-
-      let p1x = W - barPad - 10 - (p1Balls.length * bSpacing);
-      const p1y = barY + barH*0.62;
-      p1Balls.forEach(id => {
-        drawMiniBall(id, p1x + bR, p1y, bR, false);
-        p1x += bSpacing;
-      });
-
-      gCtx.save();
-      gCtx.fillStyle = p1Turn ? '#fff' : 'rgba(255,255,255,0.5)';
-      gCtx.font = `${p1Turn ? 'bold' : ''} 11px system-ui`;
-      gCtx.textAlign = 'right';
-      gCtx.textBaseline = 'middle';
-      gCtx.fillText((p1Turn ? '◂ ' : '') + p1name, W - barPad - 10, barY + 13);
-      gCtx.restore();
-
-      // ── Turn label in centre of bar ────────────────────────────────────────
-      const turnName = gs.turnName || '';
-      gCtx.fillStyle = 'rgba(255,255,255,0.35)';
-      gCtx.font = '10px system-ui';
-      gCtx.textAlign = 'center';
-      gCtx.textBaseline = 'middle';
-      gCtx.fillText(gs.solidsPlayer ? `${turnName}'s turn` : 'Break shot', halfW, barY + barH*0.82);
-
-      // ── Group label per player (shown after first pot) ─────────────────────
-      if (gs.solidsPlayer) {
+        // Group label for P0
         gCtx.font = 'bold 9px system-ui';
         gCtx.fillStyle = 'rgba(255,255,255,0.4)';
         gCtx.textAlign = 'left';
         gCtx.fillText(p0type === 'solid' ? '● SOLIDS' : '◎ STRIPES', barPad + 10, barY + barH*0.82);
-        gCtx.textAlign = 'right';
-        gCtx.fillText(p1type === 'solid' ? '● SOLIDS' : '◎ STRIPES', W - barPad - 10, barY + barH*0.82);
+
+        // 8-ball centred (always shown once groups assigned)
+        drawMiniBall(8, isSolo ? barPad + 10 + p0Balls.length * bSpacing + bR + 8 : halfW, barY + barH/2, bR+1);
+
+        // ── Right side: P1 (hidden in singleplayer) ──────────────────────────
+        if (!isSolo) {
+          const p1Turn  = gs.turn === 1;
+          const p1color = gs.colors?.[p1uid] || '#aaa';
+          const p1Balls = p1type === 'solid' ? solidIds : stripeIds;
+
+          let p1x = W - barPad - 10 - (p1Balls.length * bSpacing);
+          const p1y = barY + barH*0.62;
+          p1Balls.forEach(id => {
+            drawMiniBall(id, p1x + bR, p1y, bR);
+            p1x += bSpacing;
+          });
+
+          gCtx.save();
+          gCtx.fillStyle = p1Turn ? '#fff' : 'rgba(255,255,255,0.5)';
+          gCtx.font = `${p1Turn ? 'bold' : ''} 11px system-ui`;
+          gCtx.textAlign = 'right'; gCtx.textBaseline = 'middle';
+          gCtx.fillText((p1Turn ? '◂ ' : '') + p1name, W - barPad - 10, barY + 13);
+          gCtx.restore();
+
+          gCtx.font = 'bold 9px system-ui';
+          gCtx.fillStyle = 'rgba(255,255,255,0.4)';
+          gCtx.textAlign = 'right';
+          gCtx.fillText(p1type === 'solid' ? '● SOLIDS' : '◎ STRIPES', W - barPad - 10, barY + barH*0.82);
+        }
+
+        // ── Turn label ────────────────────────────────────────────────────────
+        const turnName = gs.turnName || '';
+        gCtx.fillStyle = 'rgba(255,255,255,0.35)';
+        gCtx.font = '10px system-ui';
+        gCtx.textAlign = 'center'; gCtx.textBaseline = 'middle';
+        gCtx.fillText(`${turnName}'s turn`, isSolo ? W*0.75 : halfW, barY + barH*0.82);
       }
 
     }
