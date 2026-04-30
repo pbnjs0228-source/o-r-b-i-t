@@ -8358,13 +8358,32 @@
 
     // Compress snake segments for Firestore (only send every 3rd point)
     function serializeForFirestore(gs, type) {
-      if (type !== 'snake') return gs;
-      const copy = JSON.parse(JSON.stringify(gs));
-      Object.values(copy.snakes || {}).forEach(sn => {
-        if (sn.segments?.length > 3) {
-          sn.segments = sn.segments.filter((_, i) => i % 3 === 0);
-        }
-      });
+      // JSON.stringify drops undefined values — this converts them to null so
+      // Firestore never receives an unsupported 'undefined' field value.
+      const copy = JSON.parse(JSON.stringify(gs, (_k, v) => v === undefined ? null : v));
+
+      if (type === 'snake') {
+        Object.values(copy.snakes || {}).forEach(sn => {
+          if (sn.segments?.length > 3) {
+            sn.segments = sn.segments.filter((_, i) => i % 3 === 0);
+          }
+        });
+      }
+
+      if (type === 'pool') {
+        // Ensure nullable uid fields are null (never undefined) before Firestore write
+        copy.solidsPlayer  = copy.solidsPlayer  ?? null;
+        copy.stripesPlayer = copy.stripesPlayer ?? null;
+        copy._winner       = copy._winner       ?? null;
+        // Strip internal-only tick flags that shouldn't persist
+        delete copy._foulPending;
+        delete copy._eightPocketed;
+        delete copy._pottedCorrect;
+        delete copy._wrongBallPending;
+        delete copy._playerInputs;
+        delete copy._endedMsgPosted;
+      }
+
       return copy;
     }
 
@@ -8506,11 +8525,13 @@
         balls: rackBalls(), pockets,
         TX, TY, TW, TH, RAIL, BR, W, H,
         players: uids, // [uid1, uid2]
-        solidsPlayer: null, // uid who has solids
-        turn: 0,            // index into players array
+        solidsPlayer:  null, // uid who has solids (null until first ball pocketed)
+        stripesPlayer: null, // uid who has stripes
+        _winner:       null, // uid of winner
+        turn: 0,             // index into players array
         turnName: players[uids[0]]?.name || 'P1',
         ballsRunning: false,
-        phase: 'aiming',    // 'aiming' | 'running'
+        phase: 'aiming',     // 'aiming' | 'running'
         aim: { angle: 0, power: 0.5 },
         foulNext: false,
         // Filter out undefined keys — uids[1] may be undefined if host starts alone.
@@ -9026,11 +9047,15 @@
       }
 
       const currentUid = gs.players?.[gs.turn];
+      const otherUid   = gs.players?.[(gs.turn + 1) % 2];
+
+      // Guard: if UIDs aren't resolved yet (solo/dev mode), skip group assignment
+      if (!currentUid || !otherUid) return;
 
       // First numbered ball pocketed: assign groups
       if (!gs.solidsPlayer) {
-        gs.solidsPlayer  = ball.solid ? currentUid : gs.players?.[(gs.turn + 1) % 2];
-        gs.stripesPlayer = ball.solid ? gs.players?.[(gs.turn + 1) % 2] : currentUid;
+        gs.solidsPlayer  = ball.solid ? currentUid : otherUid;
+        gs.stripesPlayer = ball.solid ? otherUid   : currentUid;
         // Break shot: potting any numbered ball KEEPS the turn (like real pool)
         gs._pottedCorrect = true;
         return;
