@@ -8257,7 +8257,7 @@
         gameOverOverlay.classList.remove('visible');
 
         if (!isGameHost && data.gameData) {
-          gameState = JSON.parse(JSON.stringify(data.gameData));
+          reconcileGameState(data.gameData);
         }
 
         // Host: merge playerInputs from Firestore into gameState for physics to read
@@ -8362,17 +8362,139 @@
       return copy;
     }
 
-    // ── Client render loop (all clients, runs every rAF) ─────────────────────
+    // ── Client render + prediction loop (all clients, runs every rAF) ───────
+    // Non-host players run local physics between Firestore snapshots so the
+    // game feels smooth at 60fps rather than the ~7fps Firestore write rate.
+    let _clientLastTick = 0;
+
     function startClientRenderLoop() {
       if (renderLoop) cancelAnimationFrame(renderLoop);
-      function frame() {
+
+      function frame(now) {
         if (!gameWindowBackdrop.classList.contains('visible')) { renderLoop = null; return; }
+
         if (gameState && gameLobby.style.display === 'none') {
+          // Non-host: run local prediction physics so rendering isn't locked to
+          // Firestore snapshot rate (~7fps). Host already runs physics in startHostLoop.
+          if (!isGameHost && gameState && !gameState._ended) {
+            const dt = _clientLastTick ? Math.min(now - _clientLastTick, 50) : 16;
+            _clientLastTick = now;
+            clientPredictTick(dt);
+          } else {
+            _clientLastTick = now;
+          }
+
           renderGameFrame(gameState);
         }
+
         renderLoop = requestAnimationFrame(frame);
       }
       renderLoop = requestAnimationFrame(frame);
+    }
+
+    // Run a lightweight local physics tick for non-host clients so they see
+    // smooth motion between authoritative Firestore snapshots.
+    function clientPredictTick(dt) {
+      const type = activeGameType;
+      if (type === 'pool') {
+        // Only predict during running phase — aiming is input-driven, no prediction needed
+        if (gameState.phase === 'running') updatePool(dt);
+      } else if (type === 'pong') {
+        updatePong(dt);
+      } else if (type === 'agar') {
+        // Lightweight extrapolation: move each cell along its last known velocity
+        const gs = gameState;
+        const WORLD = gs.WORLD || 3000;
+        Object.values(gs.cells || {}).forEach(cell => {
+          if (!cell.alive || !cell._vx) return;
+          cell.x = Math.max(cell.r, Math.min(WORLD - cell.r, cell.x + (cell._vx || 0)));
+          cell.y = Math.max(cell.r, Math.min(WORLD - cell.r, cell.y + (cell._vy || 0)));
+        });
+      } else if (type === 'snake') {
+        // Extrapolate head along last known direction for each alive snake
+        const gs = gameState;
+        Object.values(gs.snakes || {}).forEach(sn => {
+          if (!sn.alive || !sn.segments?.length) return;
+          const head = sn.segments[0];
+          head.x += (sn.dx || 0);
+          head.y += (sn.dy || 0);
+        });
+      }
+    }
+
+    // ── Reconcile snapshot with local prediction state ────────────────────────
+    // Called by handleGameSnapshot to blend authoritative data with predicted state.
+    // For smooth games (pool, pong) we lerp positions if close; snap if far off.
+    const RECONCILE_SNAP_THRESH = 40; // pixels — snap if further than this
+    const RECONCILE_LERP        = 0.35; // blend factor toward authority each snapshot
+
+    function reconcileGameState(freshData) {
+      const type = activeGameType;
+      if (!gameState || !freshData) { gameState = JSON.parse(JSON.stringify(freshData)); return; }
+
+      if (type === 'pool') {
+        // Reconcile ball positions
+        (freshData.balls || []).forEach(authBall => {
+          const localBall = gameState.balls?.find(b => b.id === authBall.id);
+          if (!localBall) return;
+          if (authBall.pocketed) { localBall.pocketed = true; localBall.vx = 0; localBall.vy = 0; return; }
+          const dx = authBall.x - localBall.x;
+          const dy = authBall.y - localBall.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > RECONCILE_SNAP_THRESH) {
+            localBall.x = authBall.x; localBall.y = authBall.y;
+          } else if (dist > 1) {
+            localBall.x += dx * RECONCILE_LERP;
+            localBall.y += dy * RECONCILE_LERP;
+          }
+          // Always trust authority velocity (it's the source of truth)
+          localBall.vx = authBall.vx; localBall.vy = authBall.vy;
+        });
+        // Always trust authoritative game-logic state (phase, turn, pocketed flags, scores)
+        gameState.phase         = freshData.phase;
+        gameState.turn          = freshData.turn;
+        gameState.turnName      = freshData.turnName;
+        gameState.solidsPlayer  = freshData.solidsPlayer;
+        gameState.stripesPlayer = freshData.stripesPlayer;
+        gameState._ended        = freshData._ended;
+        gameState._winner       = freshData._winner;
+        gameState._turnScoredThisShot = freshData._turnScoredThisShot;
+
+      } else if (type === 'pong') {
+        // Reconcile ball
+        const ab = freshData.ball, lb = gameState.ball;
+        if (ab && lb) {
+          const dx = ab.x - lb.x, dy = ab.y - lb.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > RECONCILE_SNAP_THRESH) { lb.x = ab.x; lb.y = ab.y; }
+          else { lb.x += dx * RECONCILE_LERP; lb.y += dy * RECONCILE_LERP; }
+          lb.vx = ab.vx; lb.vy = ab.vy;
+        }
+        // Reconcile paddles (scores are authoritative; y position can lerp)
+        Object.entries(freshData.paddles || {}).forEach(([uid, ap]) => {
+          const lp = gameState.paddles?.[uid];
+          if (!lp) return;
+          const dy = ap.y - lp.y;
+          lp.y = Math.abs(dy) > RECONCILE_SNAP_THRESH ? ap.y : lp.y + dy * RECONCILE_LERP;
+          lp.score = ap.score; // always trust score
+        });
+        gameState._ended = freshData._ended;
+
+      } else {
+        // Agar, Snake, Trivia — just replace (snapshot-driven is fine; prediction is cosmetic)
+        // For agar: stash estimated velocity per cell for clientPredictTick extrapolation
+        if (type === 'agar' && gameState.cells && freshData.cells) {
+          const prev = gameState.cells;
+          Object.entries(freshData.cells).forEach(([uid, fc]) => {
+            const pc = prev[uid];
+            if (pc && fc.alive) {
+              fc._vx = (fc.x - pc.x) * 0.5; // dampened velocity estimate
+              fc._vy = (fc.y - pc.y) * 0.5;
+            }
+          });
+        }
+        gameState = JSON.parse(JSON.stringify(freshData));
+      }
     }
 
     // ════════════════════════════════════════════════════════════════════════
