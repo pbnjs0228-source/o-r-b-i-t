@@ -8272,6 +8272,10 @@
           _poolTutorialShownThisSession = true;
           if (typeof maybeShowPoolTutorial === 'function') maybeShowPoolTutorial();
         }
+        // Check if skip vote threshold reached
+        if (activeGameType === 'pool' && typeof checkTutorialSkipVotes === 'function') {
+          checkTutorialSkipVotes();
+        }
       }
 
       if (data.state === 'ended') {
@@ -8814,6 +8818,7 @@
       cue.vy = Math.sin(angle)*power;
       gs.phase = 'running';
       gs.ballsRunning = true;
+      gs._turnScoredThisShot = false; // reset: track if a correct ball is pocketed this shot
       // Clear consumed playerInput
       if (activeGameId) {
         const turnUid = gs.players?.[gs.turn];
@@ -8898,45 +8903,71 @@
       if (!anyMoving) {
         gs.phase='aiming';
         gs.ballsRunning=false;
-        // Check 8-ball win
+
+        // Check 8-ball win/loss condition
         const eightBall = gs.balls.find(b=>b.id===8);
         if (eightBall?.pocketed) {
-          // Determine winner
           const currentUid = gs.players?.[gs.turn];
           gs._ended=true; gs._winner=currentUid;
+          return;
         }
+
+        // Switch turn if no balls were pocketed this shot
+        // (handlePocketed already switched turn for wrong-ball pockets;
+        //  if _turnScoredThisShot is false, current player missed — switch turn)
+        if (!gs._turnScoredThisShot) {
+          gs.turn=(gs.turn+1)%2;
+          gs.turnName=gs.names?.[gs.players?.[gs.turn]]||'Player';
+        }
+        gs._turnScoredThisShot = false; // reset for next shot
       }
     }
 
     function handlePocketed(ball) {
       const gs = gameState;
+      if (!gs) return; // safety: game may have ended
       if (ball.isCue) {
-        // Foul — reset cue ball
+        // Foul — reset cue ball after a short delay
+        // Capture immutable values so the callback is safe even if gameState changes
+        const TX=gs.TX, TW=gs.TW, TY=gs.TY, TH=gs.TH;
+        const nextTurn=(gs.turn+1)%2;
+        const nextName=gs.names?.[gs.players?.[nextTurn]]||'Player';
         setTimeout(()=>{
+          if (!gameState || gameState._ended) return; // abort if game over
           ball.pocketed=false;
-          ball.x=gs.TX+gs.TW*0.25; ball.y=gs.TY+gs.TH/2;
+          ball.x=TX+TW*0.25; ball.y=TY+TH/2;
           ball.vx=0; ball.vy=0;
-          // Switch turn
-          gs.turn=(gs.turn+1)%2;
-          gs.turnName=gs.names?.[gs.players?.[gs.turn]]||'Player';
+          // Switch turn (foul = opponent's turn)
+          gameState.turn=nextTurn;
+          gameState.turnName=nextName;
         },600);
         return;
       }
-      // Assign solids/stripes on first pocket
-      if (!gs.solidsPlayer&&ball.id!==8){
+      // Assign solids/stripes on first pocket (ignore 8-ball)
+      if (!gs.solidsPlayer && ball.id!==8){
         const currentUid=gs.players?.[gs.turn];
-        gs.solidsPlayer=ball.solid?currentUid:gs.players?.[(gs.turn+1)%2];
-        gs.stripesPlayer=ball.solid?gs.players?.[(gs.turn+1)%2]:currentUid;
+        if (currentUid) { // only assign if uid is valid
+          gs.solidsPlayer=ball.solid?currentUid:gs.players?.[(gs.turn+1)%2];
+          gs.stripesPlayer=ball.solid?gs.players?.[(gs.turn+1)%2]:currentUid;
+        }
       }
+      if (ball.id===8) return; // 8-ball win/loss handled in updatePool after balls stop
       // Check if it was the right type for current player
       const currentUid=gs.players?.[gs.turn];
+      if (!currentUid) return;
       const playerSolids=gs.solidsPlayer===currentUid;
-      const correctBall=(playerSolids&&ball.solid)||(!playerSolids&&!ball.solid&&ball.id!==8);
-      if (!correctBall&&ball.id!==8) {
-        // Wrong ball — next turn
+      // If solidsPlayer not yet set, keep the current player's turn (first-pocket turn)
+      if (!gs.solidsPlayer) return;
+      const correctBall=(playerSolids&&ball.solid)||(!playerSolids&&!ball.solid);
+      if (!correctBall) {
+        // Wrong ball — switch turn
         gs.turn=(gs.turn+1)%2;
         gs.turnName=gs.names?.[gs.players?.[gs.turn]]||'Player';
+      } else {
+        // Correct ball pocketed — current player keeps their turn
+        gs._turnScoredThisShot = true;
       }
+      // If correct ball, current player keeps their turn (no switch)
     }
 
     // ── PONG ─────────────────────────────────────────────────────────────────
@@ -9471,19 +9502,60 @@
     const poolTutorialSkipBtn   = document.getElementById('poolTutorialSkip');
     const poolTutorialDontShow  = document.getElementById('poolTutorialDontShow');
 
+    // Vote-to-skip state (stored in Firestore under gameData._tutorialSkipVotes)
+    // "Got it" closes for the local player only (they've read it).
+    // "Skip" requires BOTH players to vote — shows a live vote count.
+
     function maybeShowPoolTutorial() {
       if (localStorage.getItem('pool_tutorial_seen') === 'yes') return;
       poolTutorialEl.classList.add('visible');
+      _updateSkipVoteUI();
     }
+
     function hidePoolTutorial() {
       poolTutorialEl.classList.remove('visible');
       if (poolTutorialDontShow.checked) localStorage.setItem('pool_tutorial_seen', 'yes');
     }
+
+    function _updateSkipVoteUI() {
+      const votes   = gameState?._tutorialSkipVotes || {};
+      const count   = Object.keys(votes).length;
+      const needed  = 2;
+      const myVoted = auth.currentUser && !!votes[auth.currentUser.uid];
+      poolTutorialSkipBtn.textContent = myVoted
+        ? `Skipping… (${count}/${needed})`
+        : `Skip tutorial (${count}/${needed} voted)`;
+    }
+
+    // "Got it" — personal acknowledgement, hides locally, marks seen
     poolTutorialGotItBtn.addEventListener('click', hidePoolTutorial);
-    poolTutorialSkipBtn.addEventListener('click', () => {
-      // Skip still stores "seen" so it doesn't pester again this session
-      poolTutorialEl.classList.remove('visible');
+
+    // "Skip" — cast a vote in Firestore; hides for everyone when all vote
+    poolTutorialSkipBtn.addEventListener('click', async () => {
+      const myUid3 = auth.currentUser?.uid;
+      if (!myUid3 || !activeGameId) {
+        poolTutorialEl.classList.remove('visible');
+        return;
+      }
+      // Record my vote
+      try {
+        await GAMES_REF().doc(activeGameId).update({
+          [`gameData._tutorialSkipVotes.${myUid3}`]: true
+        });
+      } catch(e) { console.warn('[pool tutorial] vote error', e); }
+      _updateSkipVoteUI();
     });
+
+    // Watch for skip-vote changes arriving via the game snapshot
+    // (handleGameSnapshot already merges gameData into gameState; we just re-check here)
+    function checkTutorialSkipVotes() {
+      if (!poolTutorialEl.classList.contains('visible')) return;
+      const votes  = gameState?._tutorialSkipVotes || {};
+      const count  = Object.keys(votes).length;
+      _updateSkipVoteUI();
+      // All players voted → dismiss for everyone
+      if (count >= 2) hidePoolTutorial();
+    }
 
     // ── Invite bubble (renders in chat) ───────────────────────────────────────
     // Exposed on window so the main script (script 4) can call it from buildMessageRow.
