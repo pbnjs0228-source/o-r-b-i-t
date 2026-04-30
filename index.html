@@ -3738,24 +3738,6 @@
     .game-invite-join:active { transform: scale(0.96); }
     .game-invite-join:disabled { opacity: 0.5; cursor: default; }
 
-    /* Game ended system notice */
-    .game-ended-notice {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: #f87171;
-      padding: 6px 10px 2px;
-      text-align: center;
-    }
-    .game-ended-countdown {
-      font-size: 10px;
-      color: var(--text-soft);
-      text-align: center;
-      padding-bottom: 4px;
-      opacity: 0.7;
-    }
-
     /* Game window (fullscreen overlay) */
     .game-window-backdrop {
       position: fixed;
@@ -5365,14 +5347,6 @@
       const imageName  = data.imageName || "attachment";
       const replyTo    = data.replyTo || null;
       const gameInvite = data.gameInvite || null; // { type, gameId, name, icon }
-      const gameEnded  = data.gameEnded  || null; // { gameId, deleteAt }
-
-      // If this is a "game ended" notice that has already passed its 30-min window,
-      // delete it from Firestore immediately (handles cases where host tab was closed)
-      if (gameEnded && gameEnded.deleteAt && Date.now() > gameEnded.deleteAt) {
-        db.collection('messages').doc(id).delete().catch(() => {});
-        return null; // don't render it
-      }
 
       const profile     = userCache[uid] || {};
       const displayName = profile.displayName || "Unknown";
@@ -5490,32 +5464,6 @@
         }
       }
 
-      if (gameEnded) {
-        const endEl = document.createElement('div');
-        endEl.className = 'game-ended-notice';
-        endEl.textContent = 'THIS GAME HAS ENDED';
-        bubble.appendChild(endEl);
-
-        // Show a live countdown until auto-delete
-        if (gameEnded.deleteAt) {
-          const countdown = document.createElement('div');
-          countdown.className = 'game-ended-countdown';
-          const updateCountdown = () => {
-            const remaining = Math.max(0, gameEnded.deleteAt - Date.now());
-            if (remaining === 0) { countdown.textContent = 'Deleting…'; return; }
-            const mins = Math.floor(remaining / 60000);
-            const secs = Math.floor((remaining % 60000) / 1000);
-            countdown.textContent = `Deletes in ${mins}m ${secs.toString().padStart(2,'0')}s`;
-          };
-          updateCountdown();
-          const ticker = setInterval(() => {
-            updateCountdown();
-            if (Date.now() >= gameEnded.deleteAt) clearInterval(ticker);
-          }, 1000);
-          bubble.appendChild(countdown);
-        }
-      }
-
       row.appendChild(bubble);
       return row;
     }
@@ -5609,8 +5557,8 @@
           if (existing) existing.remove();
           liveNodes.delete(item.key);
           const row = buildMessageRow(item.doc, item.isGrouped);
-          if (!row) { renderedIds.add(item.key); return null; }
           renderedIds.add(item.key);
+          return row;
         }
         if (item.type === 'placeholder') {
           if (existing && existing.classList.contains('msg-placeholder')) {
@@ -5690,7 +5638,6 @@
           const doc = allDocs[idx];
           const { isGrouped } = groupingInfo(idx);
           const real = buildMessageRow(doc, isGrouped);
-          if (!real) { entry.target.remove(); renderedIds.add(id); return; }
           entry.target.replaceWith(real);
           renderedIds.add(id);
         });
@@ -5807,7 +5754,7 @@
             }
             const row = buildMessageRow(doc, isGrouped);
             renderedIds.add(doc.id);
-            if (row) messagesEl.appendChild(row);
+            messagesEl.appendChild(row);
           });
           if (atBottom) requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
           initUpgradeObserver();
@@ -8310,7 +8257,11 @@
         gameOverOverlay.classList.remove('visible');
 
         if (!isGameHost && data.gameData) {
-          reconcileGameState(data.gameData);
+          gameState = JSON.parse(JSON.stringify(data.gameData));
+          // Also merge playerInputs so non-host can render opponent's aim line
+          if (data.playerInputs) {
+            gameState._playerInputs = data.playerInputs;
+          }
         }
 
         // Host: merge playerInputs from Firestore into gameState for physics to read
@@ -8324,10 +8275,6 @@
         if (activeGameType === 'pool' && !_poolTutorialShownThisSession) {
           _poolTutorialShownThisSession = true;
           if (typeof maybeShowPoolTutorial === 'function') maybeShowPoolTutorial();
-        }
-        // Check if skip vote threshold reached
-        if (activeGameType === 'pool' && typeof checkTutorialSkipVotes === 'function') {
-          checkTutorialSkipVotes();
         }
       }
 
@@ -8415,139 +8362,17 @@
       return copy;
     }
 
-    // ── Client render + prediction loop (all clients, runs every rAF) ───────
-    // Non-host players run local physics between Firestore snapshots so the
-    // game feels smooth at 60fps rather than the ~7fps Firestore write rate.
-    let _clientLastTick = 0;
-
+    // ── Client render loop (all clients, runs every rAF) ─────────────────────
     function startClientRenderLoop() {
       if (renderLoop) cancelAnimationFrame(renderLoop);
-
-      function frame(now) {
+      function frame() {
         if (!gameWindowBackdrop.classList.contains('visible')) { renderLoop = null; return; }
-
         if (gameState && gameLobby.style.display === 'none') {
-          // Non-host: run local prediction physics so rendering isn't locked to
-          // Firestore snapshot rate (~7fps). Host already runs physics in startHostLoop.
-          if (!isGameHost && gameState && !gameState._ended) {
-            const dt = _clientLastTick ? Math.min(now - _clientLastTick, 50) : 16;
-            _clientLastTick = now;
-            clientPredictTick(dt);
-          } else {
-            _clientLastTick = now;
-          }
-
           renderGameFrame(gameState);
         }
-
         renderLoop = requestAnimationFrame(frame);
       }
       renderLoop = requestAnimationFrame(frame);
-    }
-
-    // Run a lightweight local physics tick for non-host clients so they see
-    // smooth motion between authoritative Firestore snapshots.
-    function clientPredictTick(dt) {
-      const type = activeGameType;
-      if (type === 'pool') {
-        // Only predict during running phase — aiming is input-driven, no prediction needed
-        if (gameState.phase === 'running') updatePool(dt);
-      } else if (type === 'pong') {
-        updatePong(dt);
-      } else if (type === 'agar') {
-        // Lightweight extrapolation: move each cell along its last known velocity
-        const gs = gameState;
-        const WORLD = gs.WORLD || 3000;
-        Object.values(gs.cells || {}).forEach(cell => {
-          if (!cell.alive || !cell._vx) return;
-          cell.x = Math.max(cell.r, Math.min(WORLD - cell.r, cell.x + (cell._vx || 0)));
-          cell.y = Math.max(cell.r, Math.min(WORLD - cell.r, cell.y + (cell._vy || 0)));
-        });
-      } else if (type === 'snake') {
-        // Extrapolate head along last known direction for each alive snake
-        const gs = gameState;
-        Object.values(gs.snakes || {}).forEach(sn => {
-          if (!sn.alive || !sn.segments?.length) return;
-          const head = sn.segments[0];
-          head.x += (sn.dx || 0);
-          head.y += (sn.dy || 0);
-        });
-      }
-    }
-
-    // ── Reconcile snapshot with local prediction state ────────────────────────
-    // Called by handleGameSnapshot to blend authoritative data with predicted state.
-    // For smooth games (pool, pong) we lerp positions if close; snap if far off.
-    const RECONCILE_SNAP_THRESH = 40; // pixels — snap if further than this
-    const RECONCILE_LERP        = 0.35; // blend factor toward authority each snapshot
-
-    function reconcileGameState(freshData) {
-      const type = activeGameType;
-      if (!gameState || !freshData) { gameState = JSON.parse(JSON.stringify(freshData)); return; }
-
-      if (type === 'pool') {
-        // Reconcile ball positions
-        (freshData.balls || []).forEach(authBall => {
-          const localBall = gameState.balls?.find(b => b.id === authBall.id);
-          if (!localBall) return;
-          if (authBall.pocketed) { localBall.pocketed = true; localBall.vx = 0; localBall.vy = 0; return; }
-          const dx = authBall.x - localBall.x;
-          const dy = authBall.y - localBall.y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist > RECONCILE_SNAP_THRESH) {
-            localBall.x = authBall.x; localBall.y = authBall.y;
-          } else if (dist > 1) {
-            localBall.x += dx * RECONCILE_LERP;
-            localBall.y += dy * RECONCILE_LERP;
-          }
-          // Always trust authority velocity (it's the source of truth)
-          localBall.vx = authBall.vx; localBall.vy = authBall.vy;
-        });
-        // Always trust authoritative game-logic state (phase, turn, pocketed flags, scores)
-        gameState.phase         = freshData.phase;
-        gameState.turn          = freshData.turn;
-        gameState.turnName      = freshData.turnName;
-        gameState.solidsPlayer  = freshData.solidsPlayer;
-        gameState.stripesPlayer = freshData.stripesPlayer;
-        gameState._ended        = freshData._ended;
-        gameState._winner       = freshData._winner;
-        gameState._turnScoredThisShot = freshData._turnScoredThisShot;
-
-      } else if (type === 'pong') {
-        // Reconcile ball
-        const ab = freshData.ball, lb = gameState.ball;
-        if (ab && lb) {
-          const dx = ab.x - lb.x, dy = ab.y - lb.y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist > RECONCILE_SNAP_THRESH) { lb.x = ab.x; lb.y = ab.y; }
-          else { lb.x += dx * RECONCILE_LERP; lb.y += dy * RECONCILE_LERP; }
-          lb.vx = ab.vx; lb.vy = ab.vy;
-        }
-        // Reconcile paddles (scores are authoritative; y position can lerp)
-        Object.entries(freshData.paddles || {}).forEach(([uid, ap]) => {
-          const lp = gameState.paddles?.[uid];
-          if (!lp) return;
-          const dy = ap.y - lp.y;
-          lp.y = Math.abs(dy) > RECONCILE_SNAP_THRESH ? ap.y : lp.y + dy * RECONCILE_LERP;
-          lp.score = ap.score; // always trust score
-        });
-        gameState._ended = freshData._ended;
-
-      } else {
-        // Agar, Snake, Trivia — just replace (snapshot-driven is fine; prediction is cosmetic)
-        // For agar: stash estimated velocity per cell for clientPredictTick extrapolation
-        if (type === 'agar' && gameState.cells && freshData.cells) {
-          const prev = gameState.cells;
-          Object.entries(freshData.cells).forEach(([uid, fc]) => {
-            const pc = prev[uid];
-            if (pc && fc.alive) {
-              fc._vx = (fc.x - pc.x) * 0.5; // dampened velocity estimate
-              fc._vy = (fc.y - pc.y) * 0.5;
-            }
-          });
-        }
-        gameState = JSON.parse(JSON.stringify(freshData));
-      }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -8759,6 +8584,19 @@
             poolDragDist = Math.min(dist, maxDist);
             poolAimPower = poolDragDist / maxDist;
           }
+          // Non-host: publish aim to Firestore so host renders their cue stick
+          if (!isGameHost && activeGameId && auth.currentUser) {
+            const myUid2 = auth.currentUser.uid;
+            const now = Date.now();
+            if (!gameCanvas._lastAimWrite || now - gameCanvas._lastAimWrite > 80) {
+              gameCanvas._lastAimWrite = now;
+              GAMES_REF().doc(activeGameId).update({
+                [`playerInputs.${myUid2}`]: {
+                  poolAim: { angle: poolAimAngle, power: poolAimPower }
+                }
+              }).catch(()=>{});
+            }
+          }
         }
       }
 
@@ -8793,6 +8631,19 @@
             poolDragDist  = Math.min(Math.sqrt(dx*dx+dy*dy), maxDist);
             poolAimPower  = poolDragDist / maxDist;
           }
+          // Non-host: publish aim to Firestore so host renders their cue stick
+          if (!isGameHost && activeGameId && auth.currentUser) {
+            const myUid2 = auth.currentUser.uid;
+            const now = Date.now();
+            if (!gameCanvas._lastAimWrite || now - gameCanvas._lastAimWrite > 80) {
+              gameCanvas._lastAimWrite = now;
+              GAMES_REF().doc(activeGameId).update({
+                [`playerInputs.${myUid2}`]: {
+                  poolAim: { angle: poolAimAngle, power: poolAimPower }
+                }
+              }).catch(()=>{});
+            }
+          }
         }
       }
       if (activeGameType==='agar' && activeGameId && auth.currentUser) {
@@ -8812,24 +8663,23 @@
       const myUid2 = auth.currentUser?.uid;
       const gs = gameState;
       if (!gs || gs.phase!=='aiming') return;
-      if (gs.players?.[gs.turn] !== myUid2) return; // not my turn
+      // Allow starting drag even if turn state is slightly stale (lag).
+      // firePoolShot will do the definitive turn check before submitting.
       const { x, y } = getScaledXY(e);
       const cue = gs.balls?.find(b=>b.isCue&&!b.pocketed);
       if (!cue) return;
       poolAimActive = true;
       poolAimPower  = 0;
       poolDragDist  = 0;
-      // Angle: aim toward the opposite side of where user clicked relative to cue
       poolAimAngle  = Math.atan2(cue.y - y, cue.x - x);
     });
 
     gameCanvas.addEventListener('touchstart', e => {
       e.preventDefault();
       if (activeGameType!=='pool') return;
-      const myUid2 = auth.currentUser?.uid;
       const gs = gameState;
       if (!gs || gs.phase!=='aiming') return;
-      if (gs.players?.[gs.turn] !== myUid2) return;
+      // Allow starting drag even if turn state lags — firePoolShot checks turn at fire time
       const { x, y } = getScaledXY(e);
       const cue = gs.balls?.find(b=>b.isCue&&!b.pocketed);
       if (!cue) return;
@@ -8843,14 +8693,26 @@
       if (!poolAimActive) return;
       poolAimActive = false;
       if (poolAimPower < 0.04) { poolAimPower = 0; return; }
+
+      const myUid2 = auth.currentUser?.uid;
+      const gs = gameState;
+
+      // Definitive turn check at fire time (not drag start, to handle lag)
+      if (!gs || gs.phase !== 'aiming') return;
+      if (gs.players?.[gs.turn] !== myUid2) {
+        // Not my turn — discard shot silently
+        poolAimPower = 0; poolDragDist = 0;
+        return;
+      }
+
       const shot = { angle: poolAimAngle, power: poolAimPower };
+
       if (isGameHost) {
-        // Host applies directly
         applyPoolShot(shot);
       } else {
-        // Non-host writes to playerInputs; host picks it up next tick
+        // Non-host: write poolShot to playerInputs so host physics picks it up
         GAMES_REF().doc(activeGameId).update({
-          [`playerInputs.${auth.currentUser?.uid}`]: { poolShot: shot }
+          [`playerInputs.${myUid2}`]: { poolShot: shot }
         }).catch(()=>{});
       }
       poolAimPower = 0;
@@ -8993,7 +8855,6 @@
       cue.vy = Math.sin(angle)*power;
       gs.phase = 'running';
       gs.ballsRunning = true;
-      gs._turnScoredThisShot = false; // reset: track if a correct ball is pocketed this shot
       // Clear consumed playerInput
       if (activeGameId) {
         const turnUid = gs.players?.[gs.turn];
@@ -9009,19 +8870,22 @@
       const gs = gameState;
       if (!gs.balls) return;
 
-      // Host: consume non-host player's shot from playerInputs
-      if (gs.phase==='aiming') {
+      // Host: consume non-host player's shot from playerInputs while aiming
+      if (gs.phase === 'aiming') {
         const turnUid = gs.players?.[gs.turn];
         const inp = gs._playerInputs?.[turnUid];
         if (inp?.poolShot) {
           applyPoolShot(inp.poolShot);
-          // Clear the input so it's not applied again
           if (gs._playerInputs) delete gs._playerInputs[turnUid];
+          // Shot just fired: skip physics this tick (phase is now 'running')
+          // but DO NOT return — fall through so physics runs immediately.
+        } else {
+          // Still aiming, nothing to process — skip physics
+          return;
         }
-        return; // don't run physics while aiming
       }
 
-      if (gs.phase!=='running') return;
+      if (gs.phase !== 'running') return;
 
       const FRICTION = 0.988;
       const BR = gs.BR||10;
@@ -9074,75 +8938,83 @@
         });
       });
 
-      // Check if all stopped
+      // ── All balls settled: process end-of-turn ─────────────────────────────
       if (!anyMoving) {
-        gs.phase='aiming';
-        gs.ballsRunning=false;
+        const currentUid = gs.players?.[gs.turn];
 
-        // Check 8-ball win/loss condition
-        const eightBall = gs.balls.find(b=>b.id===8);
-        if (eightBall?.pocketed) {
-          const currentUid = gs.players?.[gs.turn];
-          gs._ended=true; gs._winner=currentUid;
+        // 8-ball pocketed this turn
+        if (gs._eightPocketed) {
+          gs._eightPocketed = false;
+          const myType = gs.solidsPlayer === currentUid ? 'solid' : 'stripe';
+          const remaining = gs.balls.filter(b =>
+            !b.pocketed && !b.isCue && b.id !== 8 &&
+            (myType === 'solid' ? b.solid : !b.solid)
+          );
+          if (remaining.length === 0) {
+            gs._ended = true; gs._winner = currentUid; // cleared group first — WIN
+          } else {
+            gs._ended = true; gs._winner = gs.players?.[(gs.turn + 1) % 2]; // early 8 — LOSE
+          }
+          gs.phase = 'aiming'; gs.ballsRunning = false;
           return;
         }
 
-        // Switch turn if no balls were pocketed this shot
-        // (handlePocketed already switched turn for wrong-ball pockets;
-        //  if _turnScoredThisShot is false, current player missed — switch turn)
-        if (!gs._turnScoredThisShot) {
-          gs.turn=(gs.turn+1)%2;
-          gs.turnName=gs.names?.[gs.players?.[gs.turn]]||'Player';
+        // Cue ball scratch
+        if (gs._foulPending) {
+          gs._foulPending = false;
+          const cue = gs.balls.find(b => b.isCue);
+          if (cue) {
+            cue.pocketed = false;
+            cue.x = gs.TX + gs.TW * 0.25;
+            cue.y = gs.TY + gs.TH / 2;
+            cue.vx = 0; cue.vy = 0;
+          }
+          gs.turn = (gs.turn + 1) % 2;
+          gs.turnName = gs.names?.[gs.players?.[gs.turn]] || 'Player';
+          gs.phase = 'aiming'; gs.ballsRunning = false;
+          return;
         }
-        gs._turnScoredThisShot = false; // reset for next shot
+
+        // Wrong group pocketed — pass turn
+        if (gs._wrongBallPending) {
+          gs._wrongBallPending = false;
+          gs.turn = (gs.turn + 1) % 2;
+          gs.turnName = gs.names?.[gs.players?.[gs.turn]] || 'Player';
+        }
+
+        gs.phase = 'aiming';
+        gs.ballsRunning = false;
       }
     }
 
     function handlePocketed(ball) {
       const gs = gameState;
-      if (!gs) return; // safety: game may have ended
+
+      // Cue ball: mark foul, reset + turn switch happens in updatePool end-of-turn
       if (ball.isCue) {
-        // Foul — reset cue ball after a short delay
-        // Capture immutable values so the callback is safe even if gameState changes
-        const TX=gs.TX, TW=gs.TW, TY=gs.TY, TH=gs.TH;
-        const nextTurn=(gs.turn+1)%2;
-        const nextName=gs.names?.[gs.players?.[nextTurn]]||'Player';
-        setTimeout(()=>{
-          if (!gameState || gameState._ended) return; // abort if game over
-          ball.pocketed=false;
-          ball.x=TX+TW*0.25; ball.y=TY+TH/2;
-          ball.vx=0; ball.vy=0;
-          // Switch turn (foul = opponent's turn)
-          gameState.turn=nextTurn;
-          gameState.turnName=nextName;
-        },600);
+        gs._foulPending = true;
         return;
       }
-      // Assign solids/stripes on first pocket (ignore 8-ball)
-      if (!gs.solidsPlayer && ball.id!==8){
-        const currentUid=gs.players?.[gs.turn];
-        if (currentUid) { // only assign if uid is valid
-          gs.solidsPlayer=ball.solid?currentUid:gs.players?.[(gs.turn+1)%2];
-          gs.stripesPlayer=ball.solid?gs.players?.[(gs.turn+1)%2]:currentUid;
-        }
+
+      // 8-ball pocketed mid-run: mark, resolved in updatePool end-of-turn
+      if (ball.id === 8) {
+        gs._eightPocketed = true;
+        return;
       }
-      if (ball.id===8) return; // 8-ball win/loss handled in updatePool after balls stop
-      // Check if it was the right type for current player
-      const currentUid=gs.players?.[gs.turn];
-      if (!currentUid) return;
-      const playerSolids=gs.solidsPlayer===currentUid;
-      // If solidsPlayer not yet set, keep the current player's turn (first-pocket turn)
-      if (!gs.solidsPlayer) return;
-      const correctBall=(playerSolids&&ball.solid)||(!playerSolids&&!ball.solid);
-      if (!correctBall) {
-        // Wrong ball — switch turn
-        gs.turn=(gs.turn+1)%2;
-        gs.turnName=gs.names?.[gs.players?.[gs.turn]]||'Player';
-      } else {
-        // Correct ball pocketed — current player keeps their turn
-        gs._turnScoredThisShot = true;
+
+      // One currentUid — no duplicate declaration
+      const currentUid = gs.players?.[gs.turn];
+
+      // Assign groups on first numbered ball pocketed
+      if (!gs.solidsPlayer) {
+        gs.solidsPlayer  = ball.solid ? currentUid : gs.players?.[(gs.turn + 1) % 2];
+        gs.stripesPlayer = ball.solid ? gs.players?.[(gs.turn + 1) % 2] : currentUid;
       }
-      // If correct ball, current player keeps their turn (no switch)
+
+      // Wrong group = foul flag (turn passes at end of turn)
+      const iAmSolids  = gs.solidsPlayer === currentUid;
+      const correct    = (iAmSolids && ball.solid) || (!iAmSolids && !ball.solid);
+      if (!correct) gs._wrongBallPending = true;
     }
 
     // ── PONG ─────────────────────────────────────────────────────────────────
@@ -9462,63 +9334,89 @@
         gCtx.restore();
       });
 
-      // Cue stick + aim line (only for current turn player, using LOCAL aim state)
-      const currentPlayerUid=gs.players?.[gs.turn];
-      if (gs.phase==='aiming' && myUid2===currentPlayerUid){
-        const cue=gs.balls?.find(b=>b.isCue&&!b.pocketed);
-        if (cue){
-          const angle = poolAimAngle;
-          const power = poolAimPower;
-          const len   = 160 + power*80;
+      // Cue stick + aim line — shown for current turn player.
+      // Current player uses LOCAL aim (no lag). Opponent's aim comes from _playerInputs.
+      const currentPlayerUid = gs.players?.[gs.turn];
+      if (gs.phase === 'aiming') {
+        const cue = gs.balls?.find(b => b.isCue && !b.pocketed);
+        if (cue) {
+          const isMyTurn = myUid2 === currentPlayerUid;
 
-          // Ghost ball at aim direction
-          const gx = cue.x + Math.cos(angle)*BR*2.5;
-          const gy = cue.y + Math.sin(angle)*BR*2.5;
-          gCtx.globalAlpha = 0.28;
-          gCtx.beginPath(); gCtx.arc(gx,gy,BR,0,Math.PI*2);
-          gCtx.fillStyle = '#fff'; gCtx.fill();
-          gCtx.globalAlpha = 1;
+          // Pick angle+power source
+          let angle, power, dragDist;
+          if (isMyTurn) {
+            angle    = poolAimAngle;
+            power    = poolAimPower;
+            dragDist = poolDragDist;
+          } else {
+            // Remote player's aim published via playerInputs.poolAim
+            const remoteAim = gs._playerInputs?.[currentPlayerUid]?.poolAim;
+            if (!remoteAim) {
+              angle = null; // no data yet — skip cue render
+            } else {
+              angle    = remoteAim.angle || 0;
+              power    = remoteAim.power || 0;
+              dragDist = power * (gs.TW || 400) * 0.38;
+            }
+          }
 
-          // Dotted aim line
-          gCtx.setLineDash([6,8]);
-          gCtx.strokeStyle='rgba(255,255,255,0.3)'; gCtx.lineWidth=1.5;
-          gCtx.beginPath();
-          gCtx.moveTo(cue.x+Math.cos(angle)*BR, cue.y+Math.sin(angle)*BR);
-          gCtx.lineTo(cue.x+Math.cos(angle)*len, cue.y+Math.sin(angle)*len);
-          gCtx.stroke();
-          gCtx.setLineDash([]);
+          if (angle != null) {
+            const len = 160 + power * 80;
+            const alpha = isMyTurn ? 1 : 0.6; // dim opponent's cue slightly
 
-          // Cue stick (behind the ball, opposite of aim direction)
-          const backAngle = angle + Math.PI;
-          const stickStart = BR + 8 + poolDragDist*0.55;
-          gCtx.save();
-          gCtx.translate(cue.x, cue.y);
-          gCtx.rotate(backAngle);
-          const grad=gCtx.createLinearGradient(stickStart,0,stickStart+130,0);
-          grad.addColorStop(0,'#e8c97a');
-          grad.addColorStop(0.3,'#c9a84c');
-          grad.addColorStop(1,'rgba(120,80,20,0)');
-          gCtx.lineWidth=7; gCtx.strokeStyle=grad; gCtx.lineCap='round';
-          gCtx.beginPath(); gCtx.moveTo(stickStart,0); gCtx.lineTo(stickStart+130,0); gCtx.stroke();
-          // Tip
-          gCtx.lineWidth=3; gCtx.strokeStyle='#e0eeff';
-          gCtx.beginPath(); gCtx.moveTo(stickStart-3,0); gCtx.lineTo(stickStart+5,0); gCtx.stroke();
-          gCtx.restore();
+            // Ghost ball at aim direction
+            gCtx.globalAlpha = isMyTurn ? 0.28 : 0.15;
+            gCtx.beginPath(); gCtx.arc(
+              cue.x + Math.cos(angle)*BR*2.5,
+              cue.y + Math.sin(angle)*BR*2.5,
+              BR, 0, Math.PI*2
+            );
+            gCtx.fillStyle = '#fff'; gCtx.fill();
+            gCtx.globalAlpha = 1;
 
-          // Power meter bar
-          if (power > 0) {
-            const mx = gs.TX + gs.TW + 12;
-            const mH = gs.TH * 0.55;
-            const mY = gs.TY + gs.TH * 0.22;
-            gCtx.fillStyle='rgba(0,0,0,0.45)';
-            gCtx.beginPath(); gCtx.roundRect(mx, mY, 11, mH, 4); gCtx.fill();
-            const fillH = mH * power;
-            const pg = gCtx.createLinearGradient(0, mY+mH-fillH, 0, mY+mH);
-            pg.addColorStop(0,'#22c55e'); pg.addColorStop(0.6,'#f59e0b'); pg.addColorStop(1,'#ef4444');
-            gCtx.fillStyle=pg;
-            gCtx.beginPath(); gCtx.roundRect(mx, mY+mH-fillH, 11, fillH, 4); gCtx.fill();
-            gCtx.fillStyle='rgba(255,255,255,0.5)'; gCtx.font='8px system-ui'; gCtx.textAlign='center';
-            gCtx.fillText('PWR', mx+5.5, mY-4);
+            // Dotted aim line
+            gCtx.setLineDash([6, 8]);
+            gCtx.strokeStyle = isMyTurn ? 'rgba(255,255,255,0.3)' : 'rgba(200,200,255,0.2)';
+            gCtx.lineWidth = 1.5;
+            gCtx.beginPath();
+            gCtx.moveTo(cue.x + Math.cos(angle)*BR, cue.y + Math.sin(angle)*BR);
+            gCtx.lineTo(cue.x + Math.cos(angle)*len, cue.y + Math.sin(angle)*len);
+            gCtx.stroke();
+            gCtx.setLineDash([]);
+
+            // Cue stick
+            const backAngle  = angle + Math.PI;
+            const stickStart = BR + 8 + dragDist * 0.55;
+            gCtx.save();
+            gCtx.globalAlpha = alpha;
+            gCtx.translate(cue.x, cue.y);
+            gCtx.rotate(backAngle);
+            const grad = gCtx.createLinearGradient(stickStart, 0, stickStart+130, 0);
+            grad.addColorStop(0, '#e8c97a');
+            grad.addColorStop(0.3, '#c9a84c');
+            grad.addColorStop(1, 'rgba(120,80,20,0)');
+            gCtx.lineWidth = 7; gCtx.strokeStyle = grad; gCtx.lineCap = 'round';
+            gCtx.beginPath(); gCtx.moveTo(stickStart, 0); gCtx.lineTo(stickStart+130, 0); gCtx.stroke();
+            gCtx.lineWidth = 3; gCtx.strokeStyle = '#e0eeff';
+            gCtx.beginPath(); gCtx.moveTo(stickStart-3, 0); gCtx.lineTo(stickStart+5, 0); gCtx.stroke();
+            gCtx.restore();
+            gCtx.globalAlpha = 1;
+
+            // Power meter (own turn only — opponent can't see your power)
+            if (isMyTurn && power > 0) {
+              const mx = gs.TX + gs.TW + 12;
+              const mH = gs.TH * 0.55;
+              const mY = gs.TY + gs.TH * 0.22;
+              gCtx.fillStyle = 'rgba(0,0,0,0.45)';
+              gCtx.beginPath(); gCtx.roundRect(mx, mY, 11, mH, 4); gCtx.fill();
+              const fillH = mH * power;
+              const pg = gCtx.createLinearGradient(0, mY+mH-fillH, 0, mY+mH);
+              pg.addColorStop(0,'#22c55e'); pg.addColorStop(0.6,'#f59e0b'); pg.addColorStop(1,'#ef4444');
+              gCtx.fillStyle = pg;
+              gCtx.beginPath(); gCtx.roundRect(mx, mY+mH-fillH, 11, fillH, 4); gCtx.fill();
+              gCtx.fillStyle = 'rgba(255,255,255,0.5)'; gCtx.font = '8px system-ui'; gCtx.textAlign = 'center';
+              gCtx.fillText('PWR', mx+5.5, mY-4);
+            }
           }
         }
       }
@@ -9636,25 +9534,6 @@
         gameOverTitle.textContent=w?`🧠 ${w.name} wins!`:'Quiz Over';
         gameOverSub.textContent=Object.values(gs.scores||{}).map(s=>`${s.name}: ${s.score}`).join(' · ');
       }
-
-      // Host posts a "THIS GAME HAS ENDED" system message and auto-deletes it after 30 min
-      if (isGameHost && activeGameId && auth.currentUser && !gs._endedMsgPosted) {
-        gs._endedMsgPosted = true; // prevent duplicate posts on re-render
-        const DELETE_AFTER_MS = 30 * 60 * 1000; // 30 minutes
-        const deleteAt = Date.now() + DELETE_AFTER_MS;
-
-        db.collection('messages').add({
-          uid:       auth.currentUser.uid,
-          text:      'THIS GAME HAS ENDED',
-          gameEnded: { gameId: activeGameId, deleteAt },
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        }).then(ref => {
-          // Schedule client-side deletion (host tab stays open)
-          setTimeout(() => {
-            db.collection('messages').doc(ref.id).delete().catch(() => {});
-          }, DELETE_AFTER_MS);
-        }).catch(e => console.warn('[game] end message failed:', e));
-      }
     }
 
     gameOverBtn.addEventListener('click', async ()=>{
@@ -9691,64 +9570,31 @@
     }
 
     // ── Pool tutorial ─────────────────────────────────────────────────────────
-    const poolTutorialEl        = document.getElementById('poolTutorial');
-    const poolTutorialGotItBtn  = document.getElementById('poolTutorialGotIt');
-    const poolTutorialSkipBtn   = document.getElementById('poolTutorialSkip');
-    const poolTutorialDontShow  = document.getElementById('poolTutorialDontShow');
-
-    // Vote-to-skip state (stored in Firestore under gameData._tutorialSkipVotes)
-    // "Got it" closes for the local player only (they've read it).
-    // "Skip" requires BOTH players to vote — shows a live vote count.
+    const poolTutorialEl       = document.getElementById('poolTutorial');
+    const poolTutorialGotItBtn = document.getElementById('poolTutorialGotIt');
+    const poolTutorialSkipBtn  = document.getElementById('poolTutorialSkip');
+    const poolTutorialDontShow = document.getElementById('poolTutorialDontShow');
 
     function maybeShowPoolTutorial() {
+      if (!poolTutorialEl) return;
+      // Show tutorial to ALL players (host + non-host) unless they've dismissed it
       if (localStorage.getItem('pool_tutorial_seen') === 'yes') return;
       poolTutorialEl.classList.add('visible');
-      _updateSkipVoteUI();
     }
 
-    function hidePoolTutorial() {
+    function hidePoolTutorial(remember) {
+      if (!poolTutorialEl) return;
       poolTutorialEl.classList.remove('visible');
-      if (poolTutorialDontShow.checked) localStorage.setItem('pool_tutorial_seen', 'yes');
-    }
-
-    function _updateSkipVoteUI() {
-      const votes   = gameState?._tutorialSkipVotes || {};
-      const count   = Object.keys(votes).length;
-      const needed  = 2;
-      const myVoted = auth.currentUser && !!votes[auth.currentUser.uid];
-      poolTutorialSkipBtn.textContent = myVoted
-        ? `Skipping… (${count}/${needed})`
-        : `Skip tutorial (${count}/${needed} voted)`;
-    }
-
-    // "Got it" — personal acknowledgement, hides locally, marks seen
-    poolTutorialGotItBtn.addEventListener('click', hidePoolTutorial);
-
-    // "Skip" — cast a vote in Firestore; hides for everyone when all vote
-    poolTutorialSkipBtn.addEventListener('click', async () => {
-      const myUid3 = auth.currentUser?.uid;
-      if (!myUid3 || !activeGameId) {
-        poolTutorialEl.classList.remove('visible');
-        return;
+      if (remember && poolTutorialDontShow && poolTutorialDontShow.checked) {
+        localStorage.setItem('pool_tutorial_seen', 'yes');
       }
-      // Record my vote
-      try {
-        await GAMES_REF().doc(activeGameId).update({
-          [`gameData._tutorialSkipVotes.${myUid3}`]: true
-        });
-      } catch(e) { console.warn('[pool tutorial] vote error', e); }
-      _updateSkipVoteUI();
-    });
+    }
 
-    // Watch for skip-vote changes arriving via the game snapshot
-    // (handleGameSnapshot already merges gameData into gameState; we just re-check here)
-    function checkTutorialSkipVotes() {
-      if (!poolTutorialEl.classList.contains('visible')) return;
-      const votes  = gameState?._tutorialSkipVotes || {};
-      const count  = Object.keys(votes).length;
-      _updateSkipVoteUI();
-      // All players voted → dismiss for everyone
-      if (count >= 2) hidePoolTutorial();
+    if (poolTutorialGotItBtn) {
+      poolTutorialGotItBtn.addEventListener('click', () => hidePoolTutorial(true));
+    }
+    if (poolTutorialSkipBtn) {
+      poolTutorialSkipBtn.addEventListener('click', () => hidePoolTutorial(false));
     }
 
     // ── Invite bubble (renders in chat) ───────────────────────────────────────
