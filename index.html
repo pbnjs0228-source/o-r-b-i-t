@@ -8990,7 +8990,7 @@
           }
 
           gs._ended  = true;
-          gs._winner = currentPlayerWins ? currentUid : (otherUid || currentUid);
+          gs._winner = currentPlayerWins ? currentUid : (otherUid ?? currentUid);
           gs.phase = 'aiming'; gs.ballsRunning = false;
           return;
         }
@@ -9055,15 +9055,15 @@
       }
 
       const currentUid = gs.players?.[gs.turn];
-      const otherUid   = gs.players?.[(gs.turn + 1) % 2];
+      const otherUid   = gs.players?.[(gs.turn + 1) % 2] || null; // null in singleplayer
 
-      // Guard: if UIDs aren't resolved yet (solo/dev mode), skip group assignment
-      if (!currentUid || !otherUid) return;
+      // Guard: need at least the current player's UID
+      if (!currentUid) return;
 
       // First numbered ball pocketed: assign groups
       if (!gs.solidsPlayer) {
-        gs.solidsPlayer  = ball.solid ? currentUid : otherUid;
-        gs.stripesPlayer = ball.solid ? otherUid   : currentUid;
+        gs.solidsPlayer  = ball.solid ? currentUid : (otherUid || currentUid);
+        gs.stripesPlayer = ball.solid ? (otherUid || currentUid) : currentUid;
         // Break shot: potting any numbered ball KEEPS the turn (like real pool)
         gs._pottedCorrect = true;
         return;
