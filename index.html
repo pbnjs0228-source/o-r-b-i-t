@@ -8481,10 +8481,12 @@
     // ════════════════════════════════════════════════════════════════════════
     function buildPoolState(players, W, H) {
       const uids   = Object.keys(players);
+      const BAR_H  = 54; // height of the ball-tracker bar
       const TW     = Math.min(W*0.88, 820);
       const TH     = TW * 0.52;
       const TX     = (W-TW)/2;
-      const TY     = (H-TH)/2;
+      // Centre the table in the space above the bar, not the full canvas height
+      const TY     = Math.max(8, (H - BAR_H - TH) / 2);
       const RAIL   = 28;
       const BR     = 10; // ball radius
 
@@ -8973,16 +8975,22 @@
         if (gs._eightPocketed) {
           gs._eightPocketed = false;
           gs._pottedCorrect = false;
-          const myType = gs.solidsPlayer === currentUid ? 'solid' : 'stripe';
-          const remaining = gs.balls.filter(b =>
-            !b.pocketed && !b.isCue && b.id !== 8 &&
-            (myType === 'solid' ? b.solid : !b.solid)
-          );
-          if (remaining.length === 0) {
-            gs._ended = true; gs._winner = currentUid;
-          } else {
-            gs._ended = true; gs._winner = gs.players?.[(gs.turn + 1) % 2];
+          const currentUid = gs.players?.[gs.turn];
+          const otherUid   = gs.players?.[(gs.turn + 1) % 2];
+
+          // If groups not yet assigned OR player still has balls left → current player loses
+          let currentPlayerWins = false;
+          if (gs.solidsPlayer && currentUid) {
+            const iAmSolids = gs.solidsPlayer === currentUid;
+            const remaining = gs.balls.filter(b =>
+              !b.pocketed && !b.isCue && b.id !== 8 &&
+              (iAmSolids ? b.solid : !b.solid)
+            );
+            currentPlayerWins = remaining.length === 0;
           }
+
+          gs._ended  = true;
+          gs._winner = currentPlayerWins ? currentUid : (otherUid || currentUid);
           gs.phase = 'aiming'; gs.ballsRunning = false;
           return;
         }
@@ -9716,13 +9724,26 @@
         gameOverTitle.textContent=w?`🏆 ${w.name} wins!`:'Game Over';
         gameOverSub.textContent=Object.values(gs.paddles||{}).map(p=>`${p.name}: ${p.score}`).join(' · ');
       } else if (gs.type==='pool'){
-        const gs2 = data.gameData || gs;
-        const winUid  = gs2._winner || gs._winner;
-        const winName = (gs2.names || gs.names)?.[winUid] || 'Unknown';
-        const loserUid = gs2.players?.find(u => u !== winUid);
-        const loserName = (gs2.names || gs.names)?.[loserUid] || '';
-        gameOverTitle.textContent = `🎱 ${winName} wins!`;
-        gameOverSub.textContent   = loserName ? `${loserName} was defeated` : '8-Ball sunk!';
+        const winUid   = gs._winner;
+        const myUid4   = auth.currentUser?.uid;
+        const names    = gs.names || {};
+        const winName  = names[winUid] || 'Player';
+        const isSolo4  = !gs.players?.[1];
+        const isWinner = winUid === myUid4;
+
+        if (isSolo4) {
+          // Singleplayer — just say who won (always the only player)
+          gameOverTitle.textContent = `🎱 ${winName} wins!`;
+          gameOverSub.textContent   = 'Game over';
+        } else if (isWinner) {
+          gameOverTitle.textContent = '🎱 You win!';
+          gameOverSub.textContent   = `${winName} sunk all their balls`;
+        } else {
+          const loserUid  = gs.players?.find(u => u !== winUid);
+          const loserName = names[loserUid] || 'You';
+          gameOverTitle.textContent = '😬 You lose!';
+          gameOverSub.textContent   = `${winName} wins — better luck next time`;
+        }
       } else if (gs.type==='trivia'){
         const w=Object.values(gs.scores||{}).sort((a,b)=>b.score-a.score)[0];
         gameOverTitle.textContent=w?`🧠 ${w.name} wins!`:'Quiz Over';
