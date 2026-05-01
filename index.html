@@ -3738,6 +3738,26 @@
     .game-invite-join:active { transform: scale(0.96); }
     .game-invite-join:disabled { opacity: 0.5; cursor: default; }
 
+    /* Game ended notice — replaces invite card in the same bubble */
+    .game-ended-notice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 16px 10px;
+      text-align: center;
+    }
+    .game-ended-icon { font-size: 26px; opacity: 0.45; filter: grayscale(1); }
+    .game-ended-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #f87171;
+    }
+    .game-ended-sub  { font-size: 11px; color: rgba(255,255,255,0.38); }
+    .game-ended-countdown { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+
     /* Game window (fullscreen overlay) */
     .game-window-backdrop {
       position: fixed;
@@ -5347,6 +5367,14 @@
       const imageName  = data.imageName || "attachment";
       const replyTo    = data.replyTo || null;
       const gameInvite = data.gameInvite || null; // { type, gameId, name, icon }
+      const gameEnded  = data.gameEnded  || false; // true after host marks game ended
+      const deleteAt   = data.deleteAt   || null;
+
+      // Invite expired — delete silently and don't render
+      if (gameInvite && gameEnded && deleteAt && Date.now() > deleteAt) {
+        db.collection('messages').doc(id).delete().catch(() => {});
+        return null;
+      }
 
       const profile     = userCache[uid] || {};
       const displayName = profile.displayName || "Unknown";
@@ -5450,17 +5478,56 @@
       }
 
       if (gameInvite) {
-        // buildGameInviteBubble is defined in the voice/game IIFE (loaded after this
-        // script). It's exposed on window so we can call it cross-script safely.
-        const fn = window.buildGameInviteBubble;
-        if (typeof fn === 'function') {
-          bubble.appendChild(fn(gameInvite));
+        if (gameEnded) {
+          // Replace invite card with ended notice in the same bubble
+          const endEl = document.createElement('div');
+          endEl.className = 'game-ended-notice';
+
+          const iconEl = document.createElement('div');
+          iconEl.className = 'game-ended-icon';
+          iconEl.textContent = gameInvite.icon || '🎮';
+          endEl.appendChild(iconEl);
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'game-ended-title';
+          titleEl.textContent = 'THIS GAME HAS ENDED';
+          endEl.appendChild(titleEl);
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'game-ended-sub';
+          nameEl.textContent = gameInvite.name || 'Game';
+          endEl.appendChild(nameEl);
+
+          if (deleteAt) {
+            const countdown = document.createElement('div');
+            countdown.className = 'game-ended-countdown';
+            const updateCountdown = () => {
+              const remaining = Math.max(0, deleteAt - Date.now());
+              if (remaining === 0) { countdown.textContent = 'Deleting…'; return; }
+              const mins = Math.floor(remaining / 60000);
+              const secs = Math.floor((remaining % 60000) / 1000);
+              countdown.textContent = `Deletes in ${mins}m ${secs.toString().padStart(2,'0')}s`;
+            };
+            updateCountdown();
+            const ticker = setInterval(() => {
+              updateCountdown();
+              if (Date.now() >= deleteAt) clearInterval(ticker);
+            }, 1000);
+            endEl.appendChild(countdown);
+          }
+
+          bubble.appendChild(endEl);
         } else {
-          // Fallback: show a plain text invite until the IIFE has loaded
-          const fb = document.createElement('div');
-          fb.className = 'game-invite-bubble';
-          fb.innerHTML = `<div class="game-invite-header"><div class="game-invite-icon">${gameInvite.icon||'🎮'}</div><div class="game-invite-info"><div class="game-invite-title">${gameInvite.name||'Game'}</div></div></div>`;
-          bubble.appendChild(fb);
+          // Active invite — show join card
+          const fn = window.buildGameInviteBubble;
+          if (typeof fn === 'function') {
+            bubble.appendChild(fn(gameInvite));
+          } else {
+            const fb = document.createElement('div');
+            fb.className = 'game-invite-bubble';
+            fb.innerHTML = `<div class="game-invite-header"><div class="game-invite-icon">${gameInvite.icon||'🎮'}</div><div class="game-invite-info"><div class="game-invite-title">${gameInvite.name||'Game'}</div></div></div>`;
+            bubble.appendChild(fb);
+          }
         }
       }
 
@@ -8133,15 +8200,19 @@
     }
 
     // ── Invite — fixed: no mic requirement to send, join handles it ───────────
+    let activeInviteMsgId = null; // track the invite message so we can update it on end
+
     async function sendGameInvite(type, gameId, def) {
       if (!auth.currentUser) return;
       try {
-        await db.collection('messages').add({
+        const ref = await db.collection('messages').add({
           uid:        auth.currentUser.uid,
           text:       '',
           gameInvite: { type, gameId, name: def.name, icon: def.icon },
+          gameEnded:  false,
           createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
         });
+        activeInviteMsgId = ref.id;
       } catch(e) { console.warn('[game] invite send failed:', e); }
     }
 
@@ -9732,15 +9803,12 @@
         const isWinner = winUid === myUid4;
 
         if (isSolo4) {
-          // Singleplayer — just say who won (always the only player)
           gameOverTitle.textContent = `🎱 ${winName} wins!`;
           gameOverSub.textContent   = 'Game over';
         } else if (isWinner) {
           gameOverTitle.textContent = '🎱 You win!';
           gameOverSub.textContent   = `${winName} sunk all their balls`;
         } else {
-          const loserUid  = gs.players?.find(u => u !== winUid);
-          const loserName = names[loserUid] || 'You';
           gameOverTitle.textContent = '😬 You lose!';
           gameOverSub.textContent   = `${winName} wins — better luck next time`;
         }
@@ -9748,6 +9816,23 @@
         const w=Object.values(gs.scores||{}).sort((a,b)=>b.score-a.score)[0];
         gameOverTitle.textContent=w?`🧠 ${w.name} wins!`:'Quiz Over';
         gameOverSub.textContent=Object.values(gs.scores||{}).map(s=>`${s.name}: ${s.score}`).join(' · ');
+      }
+
+      // Host updates the original invite message to show "THIS GAME HAS ENDED"
+      // in place of the join button — only runs once per game
+      if (isGameHost && activeInviteMsgId && !gs._endedMsgPosted) {
+        gs._endedMsgPosted = true;
+        const DELETE_AFTER_MS = 30 * 60 * 1000;
+        db.collection('messages').doc(activeInviteMsgId).update({
+          gameEnded:  true,
+          deleteAt:   Date.now() + DELETE_AFTER_MS,
+        }).catch(e => console.warn('[game] end message update failed:', e));
+
+        // Schedule auto-delete after 30 min
+        setTimeout(() => {
+          db.collection('messages').doc(activeInviteMsgId).delete().catch(() => {});
+          activeInviteMsgId = null;
+        }, DELETE_AFTER_MS);
       }
     }
 
