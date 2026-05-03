@@ -8116,7 +8116,16 @@
     let myColor         = '#ffffff';
     let myGameName      = '';
     let lastHostWrite   = 0;
-    const HOST_WRITE_MS = 150; // ~7fps Firestore writes — physics still runs at 60fps locally
+    const HOST_WRITE_MS = 100; // 10fps Firestore writes — physics still runs at 60fps locally
+
+    // ── Client interpolation state ────────────────────────────────────────────
+    // Non-host clients extrapolate between server snapshots so movement looks
+    // smooth at 60fps even though Firestore only delivers ~10 updates/sec.
+    let _prevSnap      = null;  // gameData from second-to-last snapshot
+    let _currSnap      = null;  // gameData from last snapshot
+    let _prevSnapTime  = 0;     // performance.now() when _prevSnap arrived
+    let _currSnapTime  = 0;     // performance.now() when _currSnap arrived
+    let _snapInterval  = 100;   // rolling estimate of ms between snapshots
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
     const gamePickerBackdrop = document.getElementById('gamePickerBackdrop');
@@ -8328,11 +8337,31 @@
         gameOverOverlay.classList.remove('visible');
 
         if (!isGameHost && data.gameData) {
-          gameState = JSON.parse(JSON.stringify(data.gameData));
-          // Merge playerInputs so non-host can render opponent's aim line
-          if (data.playerInputs) {
-            gameState._playerInputs = data.playerInputs;
+          // ── Non-host interpolation: store snapshots, don't overwrite gameState
+          // directly. The client render loop will interpolate between _prevSnap
+          // and _currSnap to produce smooth 60fps visuals between 10fps writes.
+          const now = performance.now();
+          if (_currSnap) {
+            _prevSnap     = _currSnap;
+            _prevSnapTime = _currSnapTime;
+            _snapInterval = Math.max(50, Math.min(300, now - _currSnapTime));
           }
+          _currSnap     = JSON.parse(JSON.stringify(data.gameData));
+          _currSnapTime = now;
+
+          // Merge playerInputs into currSnap for pool aim rendering
+          if (data.playerInputs) {
+            _currSnap._playerInputs = data.playerInputs;
+          }
+
+          // For pool and trivia (turn-based / static) apply directly —
+          // extrapolation would cause jitter on these games.
+          if (activeGameType === 'pool' || activeGameType === 'trivia') {
+            gameState = _currSnap;
+          }
+          // Snake, agar, pong: gameState is set by the interpolation loop below.
+          // Seed it on the very first snapshot so there's always something to draw.
+          if (!gameState && _currSnap) gameState = _currSnap;
         }
 
         // Host: merge playerInputs from Firestore into gameState for physics to read
@@ -8458,12 +8487,129 @@
       return copy;
     }
 
+
+    // ── Client-side extrapolation ─────────────────────────────────────────────
+    // Produces a synthetic game state at time t past _currSnap.
+    // t=0 → exact _currSnap; t=1 → one full snapshot-interval ahead.
+    // Uses velocity derived from the delta between prev and curr snapshots.
+    // Returns null if insufficient data to extrapolate (falls back to direct render).
+    function extrapolateGameState(curr, prev, t, type) {
+      if (!curr) return null;
+      // Deep clone curr so we don't mutate the stored snapshot
+      let s;
+      try { s = JSON.parse(JSON.stringify(curr)); }
+      catch(e) { return null; }
+
+      if (type === 'snake') {
+        // Snake: extrapolate each alive snake's head using its dx/dy velocity.
+        // We don't extrapolate the full segment array — just shift the head and
+        // let the tail follow via a simple unshift so it looks smooth.
+        const WORLD = s.WORLD || 2400;
+        Object.entries(s.snakes || {}).forEach(([uid, sn]) => {
+          if (!sn.alive || !sn.segments?.length) return;
+          const vx = sn.dx || 0;
+          const vy = sn.dy || 0;
+          if (vx === 0 && vy === 0) return;
+          const head = sn.segments[0];
+          const nx = ((head.x + vx * t) % WORLD + WORLD) % WORLD;
+          const ny = ((head.y + vy * t) % WORLD + WORLD) % WORLD;
+          // Insert extrapolated head, remove last segment to preserve length
+          sn.segments.unshift({ x: nx, y: ny });
+          if (sn.segments.length > 1) sn.segments.pop();
+        });
+        return s;
+      }
+
+      if (type === 'agar') {
+        // Agar: extrapolate each alive cell toward its target (tx/ty) using speed.
+        // We have the cell's current position and its move-toward-target velocity.
+        // Without prev snap, use the cell's own stored target direction.
+        Object.entries(s.cells || {}).forEach(([uid, cell]) => {
+          if (!cell.alive) return;
+          // Velocity = (curr.pos - prev.pos) per snapshot interval
+          const prevCell = prev?.cells?.[uid];
+          let vx = 0, vy = 0;
+          if (prevCell) {
+            vx = cell.x - prevCell.x;
+            vy = cell.y - prevCell.y;
+          } else if (cell.tx != null && cell.ty != null) {
+            // Fallback: derive from stored target
+            const dx = cell.tx - cell.x, dy = cell.ty - cell.y;
+            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+            const spd  = Math.max(0.8, 5 - cell.r * 0.035);
+            vx = (dx / dist) * spd;
+            vy = (dy / dist) * spd;
+          }
+          const WORLD = s.WORLD || 3000;
+          cell.x = Math.max(cell.r, Math.min(WORLD - cell.r, cell.x + vx * t));
+          cell.y = Math.max(cell.r, Math.min(WORLD - cell.r, cell.y + vy * t));
+        });
+        return s;
+      }
+
+      if (type === 'pong') {
+        // Pong: extrapolate ball using vx/vy. Reflect off top/bottom walls.
+        // Paddles: extrapolate P2 (non-host) using velocity from prev snapshot.
+        const W = s.W || 800, H = s.H || 500;
+        if (s.ball) {
+          let bx = s.ball.x, by = s.ball.y;
+          const bvx = s.ball.vx || 0, bvy = s.ball.vy || 0;
+          // Step the ball forward t times, reflecting off walls
+          // (simple linear extrapolation — doesn't simulate paddle bounces,
+          //  but those happen rarely and the snap will correct them quickly)
+          bx += bvx * t;
+          by += bvy * t;
+          // Clamp to world bounds (prevent ball flying off screen)
+          by = Math.max(6, Math.min(H - 6, by));
+          s.ball.x = bx;
+          s.ball.y = by;
+        }
+        // Extrapolate P2 paddle from prev position
+        if (prev?.paddles) {
+          const uids = s.uids || Object.keys(s.paddles || {});
+          const uid2 = uids[1];
+          if (uid2 && s.paddles?.[uid2] && prev.paddles?.[uid2]) {
+            const PAD_H = H * 0.16;
+            const vy2 = s.paddles[uid2].y - prev.paddles[uid2].y;
+            s.paddles[uid2].y = Math.max(
+              PAD_H / 2,
+              Math.min(H - PAD_H / 2, s.paddles[uid2].y + vy2 * t)
+            );
+          }
+        }
+        return s;
+      }
+
+      return null; // unknown type — fall back to direct render
+    }
+
     // ── Client render loop (all clients, runs every rAF) ─────────────────────
     function startClientRenderLoop() {
       if (renderLoop) cancelAnimationFrame(renderLoop);
       function frame() {
         if (!gameWindowBackdrop.classList.contains('visible')) { renderLoop = null; return; }
+
         if (gameState && gameLobby.style.display === 'none') {
+          // Non-host extrapolation for realtime games (snake, agar, pong).
+          // Host renders directly from its own authoritative gameState.
+          if (!isGameHost && _currSnap && (
+              activeGameType === 'snake' ||
+              activeGameType === 'agar'  ||
+              activeGameType === 'pong'
+          )) {
+            const now = performance.now();
+            // t=0 means just received snapshot; t=1 means one full interval ahead.
+            // We allow t up to 1.8 so we keep extrapolating a bit past the expected
+            // next snapshot (handles jitter / late arrivals gracefully).
+            const elapsed  = now - _currSnapTime;
+            const t        = Math.min(1.8, elapsed / Math.max(50, _snapInterval));
+            const rendered = extrapolateGameState(_currSnap, _prevSnap, t, activeGameType);
+            if (rendered) {
+              renderGameFrame(rendered);
+              renderLoop = requestAnimationFrame(frame);
+              return;
+            }
+          }
           renderGameFrame(gameState);
         }
         renderLoop = requestAnimationFrame(frame);
@@ -9843,6 +9989,7 @@
         const initial=buildInitialGameState(activeGameType,snap.data().players);
         await GAMES_REF().doc(activeGameId).update({state:'lobby',gameData:initial});
         gameState=initial;
+        _prevSnap=null; _currSnap=null; _prevSnapTime=0; _currSnapTime=0; _snapInterval=100;
         gameLobby.style.display='flex';
         gameLobbyStart.style.display='inline-block';
         gameLobbyWaiting.style.display='none';
@@ -9863,6 +10010,8 @@
         if (isGameHost) GAMES_REF().doc(activeGameId).update({state:'ended'}).catch(()=>{});
       }
       activeGameId=null; activeGameType=null; isGameHost=false; gameState=null;
+      // Clear interpolation state so stale snapshots don't bleed into next game
+      _prevSnap=null; _currSnap=null; _prevSnapTime=0; _currSnapTime=0; _snapInterval=100;
       _poolTutorialShownThisSession = false;
       if (poolTutorialEl) poolTutorialEl.classList.remove('visible');
       gameWindowBackdrop.classList.remove('visible');
